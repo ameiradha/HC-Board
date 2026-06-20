@@ -1,0 +1,11 @@
+{
+  "name": "Jom Belajar Huruf Hijaiyah AI",
+  "description": "Aplikasi PWA pintar untuk mempelajari sebutan huruf Hijaiyah interaktif dengan kecerdasan buatan (AI) untuk murid prasekolah dan sekolah rendah.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
