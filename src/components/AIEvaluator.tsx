@@ -104,41 +104,37 @@ export default function AIEvaluator({
   };
 
   const handleTextToSpeech = () => {
-    if ("speechSynthesis" in window) {
-      playBeep();
-      setIsPlayingTts(true);
-      window.speechSynthesis.cancel();
-      
-      // Let's create an elegant spoken audio sequence
-      // We read: 'Huruf [Name]' first and then pronounce the Arabic letter with proper Arabic accent.
-      const introUtterance = new SpeechSynthesisUtterance(`Huruf ${letter.name}`);
-      introUtterance.lang = "ms-MY";
-      introUtterance.rate = 0.95;
+    playBeep();
+    setIsPlayingTts(true);
 
-      const arabicUtterance = new SpeechSynthesisUtterance(letter.char);
-      arabicUtterance.lang = "ar-SA";
-      arabicUtterance.rate = 0.75;
-      arabicUtterance.pitch = 1.1;
+    // Memainkan fail audio MP3 sebutan berkualiti tinggi dari pelayan (melalui API tts)
+    const introAudio = new Audio(`/api/tts?lang=ms&text=${encodeURIComponent(`Huruf ${letter.name}`)}`);
+    const arabicAudio = new Audio(`/api/tts?lang=ar&text=${encodeURIComponent(letter.char)}`);
 
-      // Find Arabic voice if installed
-      const voices = window.speechSynthesis.getVoices();
-      const arabicVoice = voices.find(v => v.lang.startsWith("ar"));
-      if (arabicVoice) {
-        arabicUtterance.voice = arabicVoice;
-      }
-
-      introUtterance.onend = () => {
-        window.speechSynthesis.speak(arabicUtterance);
-      };
-
-      arabicUtterance.onend = () => {
+    introAudio.addEventListener("ended", () => {
+      arabicAudio.play().catch((err) => {
+        console.warn("Gagal memainkan fail sebutan Arab:", err);
         setIsPlayingTts(false);
-      };
+      });
+    });
 
-      window.speechSynthesis.speak(introUtterance);
-    } else {
-      alert("Text to Speech tidak disokong oleh browser peranti ini.");
-    }
+    arabicAudio.addEventListener("ended", () => {
+      setIsPlayingTts(false);
+    });
+
+    introAudio.addEventListener("error", (err) => {
+      console.warn("Salah satu audio MP3 gagal dimuatkan, cuba sebut huruf Arab terus:", err);
+      arabicAudio.play().catch(() => setIsPlayingTts(false));
+    });
+
+    arabicAudio.addEventListener("error", () => {
+      setIsPlayingTts(false);
+    });
+
+    introAudio.play().catch((err) => {
+      console.warn("Sistem gagal memainkan intro sebutan, terus memainkan huruf Arab:", err);
+      arabicAudio.play().catch(() => setIsPlayingTts(false));
+    });
   };
 
   const startVoiceRecording = () => {

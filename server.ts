@@ -385,6 +385,39 @@ app.post("/api/makhraj-tip", async (req, res) => {
   }
 });
 
+// GET /api/tts - Menyahkod teks ke strim fail audio MP3 rujukan (melalui Google Translate TTS)
+app.get("/api/tts", async (req, res) => {
+  const { text, lang } = req.query;
+  if (!text) {
+    return res.status(400).send("Parameter 'text' diperlukan");
+  }
+
+  const targetLang = lang || "ar";
+  const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(String(targetLang))}&q=${encodeURIComponent(String(text))}`;
+
+  try {
+    const response = await fetch(ttsUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36",
+        "Referer": "https://translate.google.com/"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ralat menjana fail MP3: ${response.statusText}`);
+    }
+
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache file for 24 hours
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return res.end(buffer);
+  } catch (error: any) {
+    console.error("Gagal mendapatkan MP3 sebutan:", error.message);
+    return res.status(500).send("Gagal memulakan audio sebutan MP3");
+  }
+});
+
 // 3. API: Kesihatan pelayan
 app.get("/api/health", (req, res) => {
   res.json({ status: "Jom Belajar Huruf Hijaiyah AI Server is running!" });

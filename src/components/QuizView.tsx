@@ -119,20 +119,12 @@ export default function QuizView({
     }
   };
 
-  // Speaks Arabic
+  // Speaks Arabic via high quality MP3 dynamically streamed from proxy API
   const speakWord = (char: string) => {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(char);
-      utt.lang = "ar-SA";
-      utt.rate = 0.8;
-      const voices = window.speechSynthesis.getVoices();
-      const arabicVoice = voices.find(v => v.lang.startsWith("ar"));
-      if (arabicVoice) {
-        utt.voice = arabicVoice;
-      }
-      window.speechSynthesis.speak(utt);
-    }
+    const audio = new Audio(`/api/tts?lang=ar&text=${encodeURIComponent(char)}`);
+    audio.play().catch(err => {
+      console.warn("Gagal memainkan sebutan audio Arab MP3:", err);
+    });
   };
 
   const handleSubmitAnswer = (ans: string, mode: QuizType) => {
