@@ -5,7 +5,6 @@ import { playClick, playBeep, playLevelUp } from "./utils/audio";
 import AIEvaluator from "./components/AIEvaluator";
 import QRScanner from "./components/QRScanner";
 import QuizView from "./components/QuizView";
-import QRGenerator from "./components/QRGenerator";
 import ProgressCharts from "./components/ProgressCharts";
 import { 
   BookOpen, QrCode, Mic, Trophy, TrendingUp, Download, Settings, 
@@ -215,8 +214,6 @@ export default function App() {
             totalXp={totalXp}
           />
         );
-      case "download":
-        return <QRGenerator />;
       case "tetapan":
         return (
           <div className="max-w-xl mx-auto space-y-6" id="settings-stage">
@@ -353,7 +350,6 @@ export default function App() {
     { id: "latih", label: "Latih Sebutan", icon: Mic },
     { id: "kuiz", label: "Main Kuiz", icon: Trophy },
     { id: "kemajuan", label: "Kemajuan Saya", icon: TrendingUp },
-    { id: "download", label: "Muat Turun PDF Kad", icon: Download },
     { id: "tetapan", label: "Tetapan", icon: Settings },
   ];
 
@@ -506,14 +502,13 @@ export default function App() {
 
       {/* 4. BOTTOM NAVIGATION TABS FOR MOBILE ONLY (320px - 767px) */}
       <div className="sm:hidden block fixed bottom-0 inset-x-0 bg-white border-t-4 border-sky-100 z-50 pb-safe-bottom no-print shadow-2xl">
-        <nav className="grid grid-cols-7 gap-0.5 p-1 relative">
+        <nav className="grid grid-cols-6 gap-0.5 p-1 relative">
           {[
             { id: "belajar", label: "Belajar", icon: BookOpen },
             { id: "scan", label: "Scan QR", icon: QrCode },
             { id: "latih", label: "Sebutan", icon: Mic },
             { id: "kuiz", label: "Kuiz", icon: Trophy },
             { id: "kemajuan", label: "Stats", icon: TrendingUp },
-            { id: "download", label: "PDF Kad", icon: Download },
             { id: "tetapan", label: "Tetapan", icon: Settings },
           ].map((item) => {
             const Icon = item.icon;
