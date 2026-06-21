@@ -88,18 +88,28 @@ export function playClick() {
 }
 
 /**
- * Memainkan TTS Pintar menggunakan server-side MP3 atau fallback automatik
- * kepada browser Web Speech speechSynthesis jika berada di platform static (seperti Vercel).
+ * Memainkan TTS Pintar menggunakan fail MP3 sebutan berkualiti tinggi dari Google Translate TTS
+ * secara terus dari penyemak imbas tanpa bergantung kepada pelayan backend (Sesuai untuk Vercel/statik).
  */
 export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
-  const audio = new Audio(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
-  let fallbackTriggered = false;
+  const targetLang = lang === "ar" ? "ar" : "ms";
+  const mp3Url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${targetLang}&q=${encodeURIComponent(text)}`;
+  
+  const audio = new Audio(mp3Url);
+  let endedTriggered = false;
 
-  const triggerFallback = () => {
-    if (fallbackTriggered) return;
-    fallbackTriggered = true;
-    console.log(`Panggilan API TTS tidak aktif/gagal. Menggunakan fallback percakapan sistem peranti untuk: "${text}" [${lang}]`);
+  const handleEnd = () => {
+    if (!endedTriggered) {
+      endedTriggered = true;
+      if (onEnd) onEnd();
+    }
+  };
 
+  audio.addEventListener("ended", handleEnd);
+
+  audio.addEventListener("error", (e) => {
+    console.warn("Gagal mendapatkan fail MP3 daripada Google Translate, menggunakan suara kecerdasan tempatan:", e);
+    // Fallback ke Web Speech API sekiranya gagal memuatkan MP3
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -110,37 +120,31 @@ export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
         utterance.lang = "ms-MY";
         utterance.rate = 0.95;
       }
-
-      // Cari suara bahasa bersesuaian jika dipasang pada peranti
-      const voices = window.speechSynthesis.getVoices();
-      const matchVoice = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
-      if (matchVoice) {
-        utterance.voice = matchVoice;
-      }
-
-      utterance.onend = () => {
-        if (onEnd) onEnd();
-      };
-      utterance.onerror = () => {
-        if (onEnd) onEnd();
-      };
+      utterance.onend = handleEnd;
+      utterance.onerror = handleEnd;
       window.speechSynthesis.speak(utterance);
     } else {
-      console.warn("SpeechSynthesis tidak disokong oleh browser peranti ini.");
-      if (onEnd) onEnd();
+      handleEnd();
     }
-  };
-
-  audio.addEventListener("ended", () => {
-    if (onEnd) onEnd();
-  });
-
-  audio.addEventListener("error", () => {
-    triggerFallback();
   });
 
   audio.play().catch((err) => {
-    console.warn("Mainan audio disekat atau endpoint API tiada, beralih ke suara peranti:", err);
-    triggerFallback();
+    console.warn("Sekatan autouplay dikesan, menguji fallback bersuara:", err);
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      if (lang === "ar") {
+        utterance.lang = "ar-SA";
+        utterance.rate = 0.75;
+      } else {
+        utterance.lang = "ms-MY";
+        utterance.rate = 0.95;
+      }
+      utterance.onend = handleEnd;
+      utterance.onerror = handleEnd;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      handleEnd();
+    }
   });
 }
