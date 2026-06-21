@@ -1,5 +1,6 @@
 // Cute and cheerful arcade-style sounds using native Web Audio API.
 // This completely bypasses the need for external MP3 loading and works 100% offline!
+import { HIJAIYAH_LETTERS } from "../data/hijaiyah";
 
 let audioCtx: AudioContext | null = null;
 
@@ -88,13 +89,36 @@ export function playClick() {
 }
 
 /**
- * Memainkan TTS Pintar menggunakan fail MP3 sebutan berkualiti tinggi dari Google Translate TTS
- * secara terus dari penyemak imbas tanpa bergantung kepada pelayan backend (Sesuai untuk Vercel/statik).
+ * Memainkan sebutan menggunakan fail MP3 tempatan berkualiti tinggi yang dihoskan secara statik.
+ * Sesuai sepenuhnya untuk persekitaran statik tanpa pelayan (seperti Vercel).
  */
 export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
-  const targetLang = lang === "ar" ? "ar" : "ms";
-  const mp3Url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${targetLang}&q=${encodeURIComponent(text)}`;
-  
+  let mp3Url = "";
+
+  if (lang === "ms") {
+    // Cari huruf mengikut nama (contoh: "Huruf Alif")
+    const cleanName = text.replace("Huruf ", "").replace(/\(.*?\)/, "").trim().toLowerCase();
+    const found = HIJAIYAH_LETTERS.find(l => {
+      const normalizedLName = l.name.replace(/\(.*?\)/, "").trim().toLowerCase();
+      return normalizedLName === cleanName || l.name.toLowerCase().includes(cleanName) || cleanName.includes(normalizedLName);
+    });
+    if (found) {
+      mp3Url = `/audio/intro_${found.id}.mp3`;
+    }
+  } else if (lang === "ar") {
+    // Cari huruf mengikut tulisan arab asli (contoh: "أ")
+    const found = HIJAIYAH_LETTERS.find(l => l.char === text || text.includes(l.char));
+    if (found) {
+      mp3Url = `/audio/letter_${found.id}.mp3`;
+    }
+  }
+
+  // Jika tidak ditemui fail tempatan, gunakan Google Translate online langsung sebagai sandaran
+  if (!mp3Url) {
+    const targetLang = lang === "ar" ? "ar" : "ms";
+    mp3Url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${targetLang}&q=${encodeURIComponent(text)}`;
+  }
+
   const audio = new Audio(mp3Url);
   let endedTriggered = false;
 
@@ -108,8 +132,7 @@ export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
   audio.addEventListener("ended", handleEnd);
 
   audio.addEventListener("error", (e) => {
-    console.warn("Gagal mendapatkan fail MP3 daripada Google Translate, menggunakan suara kecerdasan tempatan:", e);
-    // Fallback ke Web Speech API sekiranya gagal memuatkan MP3
+    console.warn(`Gagal memuatkan MP3 daripada ${mp3Url}, mencuba suara kecerdasan sistem tempatan:`, e);
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -129,7 +152,7 @@ export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
   });
 
   audio.play().catch((err) => {
-    console.warn("Sekatan autouplay dikesan, menguji fallback bersuara:", err);
+    console.warn("Sekatan autoplay dikesan, menguji percakapan suara sistem:", err);
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
