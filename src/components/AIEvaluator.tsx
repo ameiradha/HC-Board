@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { HijaiyahLetter } from "../data/hijaiyah";
-import { playBeep, playSuccess, playFail, playClick } from "../utils/audio";
+import { playBeep, playSuccess, playFail, playClick, playTTS } from "../utils/audio";
 import { 
   Volume2, Mic, MicOff, Star, Sparkles, Award, Zap, RefreshCw, 
   BookOpen, HelpCircle, AlertCircle, ArrowLeft, ArrowRight, CheckCircle2,
@@ -107,33 +107,11 @@ export default function AIEvaluator({
     playBeep();
     setIsPlayingTts(true);
 
-    // Memainkan fail audio MP3 sebutan berkualiti tinggi dari pelayan (melalui API tts)
-    const introAudio = new Audio(`/api/tts?lang=ms&text=${encodeURIComponent(`Huruf ${letter.name}`)}`);
-    const arabicAudio = new Audio(`/api/tts?lang=ar&text=${encodeURIComponent(letter.char)}`);
-
-    introAudio.addEventListener("ended", () => {
-      arabicAudio.play().catch((err) => {
-        console.warn("Gagal memainkan fail sebutan Arab:", err);
+    // Sebut nama huruf dalam bahasa Melayu, kemudian sebut sebutan huruf Arab sebenar
+    playTTS(`Huruf ${letter.name}`, "ms", () => {
+      playTTS(letter.char, "ar", () => {
         setIsPlayingTts(false);
       });
-    });
-
-    arabicAudio.addEventListener("ended", () => {
-      setIsPlayingTts(false);
-    });
-
-    introAudio.addEventListener("error", (err) => {
-      console.warn("Salah satu audio MP3 gagal dimuatkan, cuba sebut huruf Arab terus:", err);
-      arabicAudio.play().catch(() => setIsPlayingTts(false));
-    });
-
-    arabicAudio.addEventListener("error", () => {
-      setIsPlayingTts(false);
-    });
-
-    introAudio.play().catch((err) => {
-      console.warn("Sistem gagal memainkan intro sebutan, terus memainkan huruf Arab:", err);
-      arabicAudio.play().catch(() => setIsPlayingTts(false));
     });
   };
 

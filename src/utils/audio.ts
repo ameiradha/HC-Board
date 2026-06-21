@@ -86,3 +86,61 @@ export function playLevelUp() {
 export function playClick() {
   playNote(400, 0.08, "sine");
 }
+
+/**
+ * Memainkan TTS Pintar menggunakan server-side MP3 atau fallback automatik
+ * kepada browser Web Speech speechSynthesis jika berada di platform static (seperti Vercel).
+ */
+export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
+  const audio = new Audio(`/api/tts?lang=${lang}&text=${encodeURIComponent(text)}`);
+  let fallbackTriggered = false;
+
+  const triggerFallback = () => {
+    if (fallbackTriggered) return;
+    fallbackTriggered = true;
+    console.log(`Panggilan API TTS tidak aktif/gagal. Menggunakan fallback percakapan sistem peranti untuk: "${text}" [${lang}]`);
+
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      if (lang === "ar") {
+        utterance.lang = "ar-SA";
+        utterance.rate = 0.75;
+      } else {
+        utterance.lang = "ms-MY";
+        utterance.rate = 0.95;
+      }
+
+      // Cari suara bahasa bersesuaian jika dipasang pada peranti
+      const voices = window.speechSynthesis.getVoices();
+      const matchVoice = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+      if (matchVoice) {
+        utterance.voice = matchVoice;
+      }
+
+      utterance.onend = () => {
+        if (onEnd) onEnd();
+      };
+      utterance.onerror = () => {
+        if (onEnd) onEnd();
+      };
+      window.speechSynthesis.speak(utterance);
+    } else {
+      console.warn("SpeechSynthesis tidak disokong oleh browser peranti ini.");
+      if (onEnd) onEnd();
+    }
+  };
+
+  audio.addEventListener("ended", () => {
+    if (onEnd) onEnd();
+  });
+
+  audio.addEventListener("error", () => {
+    triggerFallback();
+  });
+
+  audio.play().catch((err) => {
+    console.warn("Mainan audio disekat atau endpoint API tiada, beralih ke suara peranti:", err);
+    triggerFallback();
+  });
+}

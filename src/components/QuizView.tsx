@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { HijaiyahLetter, HIJAIYAH_LETTERS } from "../data/hijaiyah";
-import { playBeep, playSuccess, playFail, playClick } from "../utils/audio";
+import { playBeep, playSuccess, playFail, playClick, playTTS } from "../utils/audio";
 import QRScanner from "./QRScanner";
 import { 
   Trophy, Star, Play, Timer, ArrowRight, CheckCircle2, 
@@ -119,12 +119,9 @@ export default function QuizView({
     }
   };
 
-  // Speaks Arabic via high quality MP3 dynamically streamed from proxy API
+  // Speaks Arabic via high quality MP3 dynamically streamed from proxy API, with system-fallback
   const speakWord = (char: string) => {
-    const audio = new Audio(`/api/tts?lang=ar&text=${encodeURIComponent(char)}`);
-    audio.play().catch(err => {
-      console.warn("Gagal memainkan sebutan audio Arab MP3:", err);
-    });
+    playTTS(char, "ar");
   };
 
   const handleSubmitAnswer = (ans: string, mode: QuizType) => {
