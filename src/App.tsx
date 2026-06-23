@@ -12,8 +12,9 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const [activePanel, setActivePanel] = useState<string>("belajar");
+  const [activePanel, setActivePanel] = useState<string>("scan");
   const [currentLetterIndex, setCurrentLetterIndex] = useState(0);
+  const [autoPlayTts, setAutoPlayTts] = useState<boolean>(false);
 
   // Gamification Currencies (synchronized in localStorage)
   const [totalXp, setTotalXp] = useState<number>(() => {
@@ -142,6 +143,8 @@ export default function App() {
             }}
             addXp={addXp}
             updateLetterMastery={updateLetterMastery}
+            autoPlayOnMount={autoPlayTts}
+            onClearAutoPlay={() => setAutoPlayTts(false)}
           />
         );
       case "scan":
@@ -153,6 +156,7 @@ export default function App() {
               const idx = HIJAIYAH_LETTERS.findIndex((x) => x.id === letter.id);
               if (idx !== -1) {
                 setCurrentLetterIndex(idx);
+                setAutoPlayTts(true);
                 setActivePanel("belajar");
               }
             }}
@@ -345,7 +349,6 @@ export default function App() {
 
   // Nav Links List
   const navItems = [
-    { id: "belajar", label: "Belajar Huruf", icon: BookOpen },
     { id: "scan", label: "Scan QR Kad", icon: QrCode },
     { id: "latih", label: "Latih Sebutan", icon: Mic },
     { id: "kuiz", label: "Main Kuiz", icon: Trophy },
@@ -502,9 +505,8 @@ export default function App() {
 
       {/* 4. BOTTOM NAVIGATION TABS FOR MOBILE ONLY (320px - 767px) */}
       <div className="sm:hidden block fixed bottom-0 inset-x-0 bg-white border-t-4 border-sky-100 z-50 pb-safe-bottom no-print shadow-2xl">
-        <nav className="grid grid-cols-6 gap-0.5 p-1 relative">
+        <nav className="grid grid-cols-5 gap-0.5 p-1 relative">
           {[
-            { id: "belajar", label: "Belajar", icon: BookOpen },
             { id: "scan", label: "Scan QR", icon: QrCode },
             { id: "latih", label: "Sebutan", icon: Mic },
             { id: "kuiz", label: "Kuiz", icon: Trophy },

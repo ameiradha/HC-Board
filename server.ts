@@ -11,6 +11,19 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Hidangkan folder /audio dan public secara langsung oleh Express dengan pengepala CORS
+app.use("/audio", express.static(path.join(process.cwd(), "public/audio"), {
+  setHeaders: (res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+  }
+}));
+app.use(express.static(path.join(process.cwd(), "public"), {
+  setHeaders: (res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+}));
+
 // Lazy-initialize Gemini client to prevent startup crashes if key is missing
 let aiInstance: GoogleGenAI | null = null;
 function getGemini(): GoogleGenAI {

@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { HijaiyahLetter, HIJAIYAH_LETTERS } from "../data/hijaiyah";
-import { playBeep, playClick } from "../utils/audio";
-import { Camera, AlertCircle, RefreshCw, Layers, CheckCircle, Printer } from "lucide-react";
+import { playBeep, playClick, playTTS } from "../utils/audio";
+import { Camera, AlertCircle, RefreshCw, Layers, CheckCircle, Printer, Loader2 } from "lucide-react";
 import QRGenerator from "./QRGenerator";
+
+// @ts-ignore
+import jsQR from "jsqr";
 
 interface QRScannerProps {
   onScanned: (letter: HijaiyahLetter) => void;
@@ -11,13 +14,31 @@ interface QRScannerProps {
 
 export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) {
   const [activeSubTab, setActiveSubTab] = useState<"imbas" | "cetak">("imbas");
-  const [useSimulated, setUseSimulated] = useState(true);
+  const [useSimulated, setUseSimulated] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("hijaiyah_pref_use_real_camera");
+      return saved === "true" ? false : true;
+    } catch (e) {
+      return true;
+    }
+  });
   const [cameraPermission, setCameraPermission] = useState<"pending" | "granted" | "denied">("pending");
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [scanning, setScanning] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameIdRef = useRef<number | null>(null);
+
+  const cycleCamera = () => {
+    if (devices.length === 0) return;
+    const currentIndex = devices.findIndex(d => d.deviceId === selectedDeviceId);
+    const nextIndex = (currentIndex + 1) % devices.length;
+    startCamera(devices[nextIndex].deviceId);
+  };
 
   // Stop camera stream upon unmount
   useEffect(() => {
@@ -26,56 +47,272 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
     };
   }, []);
 
-  const startCamera = async () => {
-    setUseSimulated(false);
-    setCameraPermission("pending");
-    setScanning(true);
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      setCameraPermission("granted");
-      
-      // Start polling frames for mockup qr decoding scanning lines
-      requestAnimationFrame(scanFrame);
-    } catch (err) {
-      console.warn("Camera access denied or unavailable:", err);
-      setCameraPermission("denied");
-      setUseSimulated(true);
-    }
-  };
+  // Keep scanned callback in a stable ref to prevent stale closures and effect restarts
+  const onScannedRef = useRef(onScanned);
+  useEffect(() => {
+    onScannedRef.current = onScanned;
+  }, [onScanned]);
 
   const stopCamera = () => {
+    if (animationFrameIdRef.current) {
+      cancelAnimationFrame(animationFrameIdRef.current);
+      animationFrameIdRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setActiveStream(null);
     setScanning(false);
   };
 
-  const scanFrame = () => {
-    if (!streamRef.current || !videoRef.current) return;
-    
-    // Periodically draw mock lines or actual checks.
-    // In a sandbox, standard scanning is highly prone to permission blocks,
-    // so if the camera succeeds, we simulate successful scanning on the current live feed
-    // after 3 seconds of holding a letter near, or we can prompt standard scanning.
-    // Let's keep it ticking so the scan laser animation looks incredibly fluid:
-    if (scanning) {
-      setTimeout(() => {
-        requestAnimationFrame(scanFrame);
-      }, 100);
+  const startCamera = async (deviceId?: string) => {
+    try {
+      localStorage.setItem("hijaiyah_pref_use_real_camera", "true");
+    } catch (e) {}
+    setUseSimulated(false);
+    setCameraPermission("pending");
+    setScanning(true);
+
+    // Hentikan sebarang penstriman aktif secara manual sebelum memulakan stream baharu
+    if (animationFrameIdRef.current) {
+      cancelAnimationFrame(animationFrameIdRef.current);
+      animationFrameIdRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setActiveStream(null);
+
+    try {
+      let stream: MediaStream;
+      
+      try {
+        // Cubaan 1: Menggunakan ideal & exact constraints
+        const constraints: MediaStreamConstraints = {
+          video: deviceId 
+            ? { deviceId: { exact: deviceId } }
+            : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (firstErr) {
+        console.warn("Cubaan pertama gagal, mencuba cubaan 2 (konstrain lebih ringkas):", firstErr);
+        try {
+          // Cubaan 2: Menggunakan facingMode standard tanpa parameter resolusi ketat atau exact ID
+          const constraints: MediaStreamConstraints = {
+            video: deviceId 
+              ? { deviceId: deviceId }
+              : { facingMode: "environment" }
+          };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (secondErr) {
+          console.warn("Cubaan kedua gagal, mencuba cubaan 3 (kamera am):", secondErr);
+          // Cubaan 3: Fallback ke sebarang kamera video yang boleh diakses (paling selamat)
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+      }
+
+      streamRef.current = stream;
+      setActiveStream(stream);
+      setCameraPermission("granted");
+
+      // Dapatkan senarai semua peranti kamera bagi penyegerakan ID peranti aktif
+      try {
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = allDevices.filter(d => d.kind === "videoinput");
+        setDevices(videoInputs);
+
+        const activeTrack = stream.getVideoTracks()[0];
+        if (activeTrack) {
+          const settings = activeTrack.getSettings();
+          if (settings.deviceId) {
+            setSelectedDeviceId(settings.deviceId);
+          } else if (deviceId) {
+            setSelectedDeviceId(deviceId);
+          } else if (videoInputs.length > 0) {
+            setSelectedDeviceId(videoInputs[0].deviceId);
+          }
+        }
+      } catch (e) {
+        console.warn("Gagal dapatkan senarai kamera atau menyegerakan id peranti:", e);
+      }
+
+    } catch (err) {
+      console.error("Ralat Kamera:", err);
+      setCameraPermission("denied");
+      setUseSimulated(true);
+      setScanning(false);
     }
   };
 
+  // Auto-start camera on initial mount if real camera was preferred
+  useEffect(() => {
+    try {
+      const savedPref = localStorage.getItem("hijaiyah_pref_use_real_camera");
+      if (savedPref === "true" && activeSubTab === "imbas") {
+        startCamera();
+      }
+    } catch (e) {}
+  }, []);
+
+  // Automatically release camera when switching to print/download tab, and restart when returning to scanner tab
+  useEffect(() => {
+    if (activeSubTab === "cetak") {
+      stopCamera();
+    } else if (activeSubTab === "imbas") {
+      try {
+        const savedPref = localStorage.getItem("hijaiyah_pref_use_real_camera");
+        if (savedPref === "true") {
+          startCamera(selectedDeviceId || undefined);
+        }
+      } catch (e) {}
+    }
+  }, [activeSubTab]);
+
+  // Keep camera authorized and restore stream automatically when browser tab becomes active again
+  useEffect(() => {
+    const handleVisibilityAndFocus = () => {
+      if (document.visibilityState === "visible") {
+        console.log("Tab is active/focused. Ensuring camera permission & stream are kept active...");
+        try {
+          const savedPref = localStorage.getItem("hijaiyah_pref_use_real_camera");
+          if (savedPref === "true" && activeSubTab === "imbas") {
+            setUseSimulated(false);
+            const video = videoRef.current;
+            if (video && streamRef.current && streamRef.current.active) {
+              // stream is still active, just ensure the video plays
+              video.play().catch(err => {
+                console.warn("Auto-play failed, restarting camera stream:", err);
+                startCamera(selectedDeviceId || undefined);
+              });
+            } else {
+              // stream was closed or suspended by backgrounding tab, restart it automatically
+              console.log("Stream suspended or inactive, reviving camera stream automatically...");
+              startCamera(selectedDeviceId || undefined);
+            }
+          }
+        } catch (e) {}
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityAndFocus);
+    window.addEventListener("focus", handleVisibilityAndFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityAndFocus);
+      window.removeEventListener("focus", handleVisibilityAndFocus);
+    };
+  }, [activeSubTab, selectedDeviceId]);
+
+  // Securely bind the active stream as soon as the HTML <video> element enters the DOM
+  useEffect(() => {
+    if (videoRef.current && activeStream) {
+      const video = videoRef.current;
+      if (video.srcObject !== activeStream) {
+        video.srcObject = activeStream;
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("autoplay", "true");
+        video.setAttribute("muted", "true");
+        
+        const playVideo = () => {
+          video.play().catch(e => {
+            console.warn("Ralat memulakan mainan video automatik:", e);
+          });
+        };
+
+        video.onloadedmetadata = playVideo;
+        playVideo();
+      }
+    }
+  }, [activeStream, useSimulated]);
+
+  // Robust, continuous requestAnimationFrame frame-scanning interval
+  useEffect(() => {
+    let active = true;
+    let localFrameId: number | null = null;
+
+    const tick = () => {
+      if (!active) return;
+      
+      const video = videoRef.current;
+      if (scanning && !useSimulated && video && video.readyState >= 2 /* HAVE_CURRENT_DATA */) {
+        const canvas = canvasRef.current || document.createElement("canvas");
+        canvasRef.current = canvas;
+        const ctx = canvas.getContext("2d");
+        
+        if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          try {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            // Terjemah QR dengan selamat menggunakan jsQR default/namespace fallback
+            const decodeQR = typeof jsQR === "function" ? jsQR : (jsQR as any).default;
+            const code = decodeQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert"
+            });
+
+            if (code && code.data) {
+              console.log("Kod QR berjaya diimbas:", code.data);
+              if (code.data.startsWith("hijaiyah:")) {
+                const letterName = code.data.replace("hijaiyah:", "").trim().toLowerCase();
+                const found = HIJAIYAH_LETTERS.find(l => l.name.toLowerCase() === letterName);
+                if (found) {
+                  playBeep();
+                  if (navigator.vibrate) {
+                    try { navigator.vibrate(200); } catch (e) {}
+                  }
+                  
+                  // Mainkan sebutan huruf secara lisan automatik sejurus dikesan
+                  playTTS(`Huruf ${found.name}`, "ms", () => {
+                    playTTS(found.char, "ar", undefined, found.id);
+                  }, found.id);
+
+                  onScannedRef.current(found);
+                  stopCamera();
+                  setUseSimulated(true);
+                  active = false;
+                  return;
+                }
+              }
+            }
+          } catch (err) {
+            console.warn("Ralat mendedahkan data kod QR:", err);
+          }
+        }
+      }
+
+      if (active && scanning && !useSimulated) {
+        localFrameId = requestAnimationFrame(tick);
+      }
+    };
+
+    if (scanning && cameraPermission === "granted" && !useSimulated && activeStream) {
+      localFrameId = requestAnimationFrame(tick);
+    }
+
+    return () => {
+      active = false;
+      if (localFrameId) {
+        cancelAnimationFrame(localFrameId);
+      }
+    };
+  }, [scanning, cameraPermission, useSimulated, activeStream]);
+
   const triggerMockScan = (letter: HijaiyahLetter) => {
     playBeep();
+    // Mainkan sebutan huruf secara lisan automatik sejurus dikesan
+    playTTS(`Huruf ${letter.name}`, "ms", () => {
+      playTTS(letter.char, "ar", undefined, letter.id);
+    }, letter.id);
     onScanned(letter);
   };
 
@@ -153,12 +390,13 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
                 <div className="relative w-full h-full flex items-center justify-center bg-black">
                   <video
                     ref={videoRef}
+                    autoPlay
                     playsInline
                     muted
                     className="w-full h-full object-cover"
                   />
                   {/* Scan Overlay Laser Mask */}
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="relative w-48 h-48 border-4 border-emerald-400 rounded-2xl">
                       {/* Scan Laser Sweeper */}
                       <div className="absolute inset-x-0 h-0.5 bg-red-500 animate-[bounce_2s_infinite] shadow-[0_0_10px_rgba(239,68,68,0.8)]"></div>
@@ -166,14 +404,49 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
                   </div>
 
                   {cameraPermission === "granted" && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-black/70 px-3 py-1.5 rounded-full text-xs text-center text-emerald-300">
-                      Kamera aktif. Pilih mod simulator di tepi jika perlu.
+                    <div className="absolute bottom-4 left-4 right-4 bg-black/70 px-3 py-1.5 rounded-full text-xs text-center text-emerald-300 pointer-events-none">
+                      Imbasan QR sedang berjalan...
+                    </div>
+                  )}
+
+                  {cameraPermission === "pending" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 p-4 text-center">
+                      <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mb-3" />
+                      <p className="font-bold text-sm text-white font-sans">Memulakan Kamera...</p>
+                      <p className="text-slate-300 text-xs max-w-sm mt-1 leading-relaxed">
+                        Sila klik "Benarkan" sekiranya pelayar anda meminta izin akses kepada kamera peranti.
+                      </p>
+                    </div>
+                  )}
+
+                  {cameraPermission === "denied" && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 p-4 text-center">
+                      <AlertCircle className="w-10 h-10 text-amber-400 mb-2" />
+                      <p className="font-bold text-sm text-white font-sans">Akses Kamera Disekat / Tidak Aktif</p>
+                      <p className="text-slate-300 text-xs max-w-sm mt-1 leading-relaxed">
+                        Akses kamera dinafikan atau peranti tiada perkakasan kamera. Sila gunakan tetapan pelayar anda untuk membenarkan akses, atau buka aplikasi ini dalam **Tab Baru** di luar tetingkap iframe AI Studio.
+                      </p>
+                      <button
+                        onClick={() => {
+                          stopCamera();
+                          try {
+                            localStorage.setItem("hijaiyah_pref_use_real_camera", "false");
+                          } catch (e) {}
+                          setUseSimulated(true);
+                        }}
+                        className="mt-4 px-4 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-full hover:bg-amber-600 cursor-pointer"
+                      >
+                        Batal & Guna Simulator Imbas
+                      </button>
                     </div>
                   )}
 
                   <button
                     onClick={() => {
                       stopCamera();
+                      try {
+                        localStorage.setItem("hijaiyah_pref_use_real_camera", "false");
+                      } catch (e) {}
                       setUseSimulated(true);
                     }}
                     className="absolute top-4 right-4 p-2 bg-slate-800/80 rounded-full hover:bg-slate-700 text-white cursor-pointer"
@@ -184,6 +457,60 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
                 </div>
               )}
             </div>
+
+            {cameraPermission !== "granted" && (
+              <div className="mt-4">
+                <button
+                  onClick={() => startCamera()}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Camera className="w-4 h-4" />
+                  Benarkan Akses Kamera
+                </button>
+              </div>
+            )}
+
+            {/* Pengecam Kamera Sebenar / Tukar Kamera */}
+            {!useSimulated && devices.length > 0 && (
+              <div className="mt-3 bg-slate-50 border border-slate-200/60 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in no-print">
+                <div className="flex items-start gap-2">
+                  <Camera className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="text-xs text-slate-800 font-bold block leading-none font-sans">
+                      Berbilang Kamera Dikesan!
+                    </span>
+                    <span className="text-[10px] text-slate-500 leading-normal">
+                      Sila tukar saluran sekiranya skrin gelap atau kamera salah dipilih.
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => startCamera()}
+                    className="bg-slate-600 hover:bg-slate-700 text-white text-xs px-3 py-1.5 rounded-lg active:scale-95 transition-all shadow-sm"
+                  >
+                    Utama
+                  </button>
+                  <select
+                    value={selectedDeviceId}
+                    onChange={(e) => startCamera(e.target.value)}
+                    className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-700 w-full shadow-sm cursor-pointer"
+                  >
+                    {devices.map((device, idx) => (
+                      <option key={device.deviceId || idx} value={device.deviceId}>
+                        {device.label || `Kamera ${idx + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={cycleCamera}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg active:scale-95 transition-all shadow-sm"
+                  >
+                    Tukar
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Simulator Selector Panel - ALWAYS present to guarantee playability */}
             <div className="mt-6 border-t border-slate-100 pt-5">

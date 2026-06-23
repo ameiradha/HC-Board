@@ -88,74 +88,188 @@ export function playClick() {
   playNote(400, 0.08, "sine");
 }
 
+let currentPlayingAudio: HTMLAudioElement | null = null;
+let currentUtterance: SpeechSynthesisUtterance | null = null;
+let activeBufferSource: AudioBufferSourceNode | null = null;
+const audioBufferCache: Record<string, AudioBuffer> = {};
+
+/**
+ * Memainkan fail audio MP3 menggunakan Web Audio API. 
+ * Kaedah ini jauh lebih selamat daripada tag <audio> di dalam iFrame web.
+ */
+async function playMp3ViaWebAudio(url: string, onEnd?: () => void): Promise<boolean> {
+  try {
+    const ctx = getAudioContext();
+    
+    // Berhentikan audio yang sedang dimainkan
+    if (activeBufferSource) {
+      try {
+        activeBufferSource.stop();
+        activeBufferSource.disconnect();
+      } catch (e) {}
+      activeBufferSource = null;
+    }
+
+    let buffer = audioBufferCache[url];
+    if (!buffer) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      // Menjana audio buffer
+      buffer = await ctx.decodeAudioData(arrayBuffer);
+      audioBufferCache[url] = buffer;
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    activeBufferSource = source;
+
+    source.onended = () => {
+      if (activeBufferSource === source) {
+        activeBufferSource = null;
+      }
+      if (onEnd) onEnd();
+    };
+
+    source.start(0);
+    return true;
+  } catch (err) {
+    console.warn("Kemerosotan main balik Web Audio API, kembali ke kaedah standard:", err);
+    return false;
+  }
+}
+
 /**
  * Memainkan sebutan menggunakan fail MP3 tempatan berkualiti tinggi yang dihoskan secara statik.
  * Sesuai sepenuhnya untuk persekitaran statik tanpa pelayan (seperti Vercel).
  */
-export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
+export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void, letterId?: number) {
+  // Hentikan sebarang audio yang sedang dimainkan untuk mengelakkan tumpang-tindih (overlap)
+  if (activeBufferSource) {
+    try {
+      activeBufferSource.stop();
+      activeBufferSource.disconnect();
+    } catch (e) {}
+    activeBufferSource = null;
+  }
+
+  if (currentPlayingAudio) {
+    try {
+      currentPlayingAudio.pause();
+      currentPlayingAudio.src = "";
+    } catch (e) {}
+    currentPlayingAudio = null;
+  }
+
+  if (currentUtterance && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {}
+    currentUtterance = null;
+  }
+
   let mp3Url = "";
 
-  if (lang === "ms") {
-    // Cari huruf mengikut nama (contoh: "Huruf Alif")
-    const cleanName = text.replace("Huruf ", "").replace(/\(.*?\)/, "").trim().toLowerCase();
-    const found = HIJAIYAH_LETTERS.find(l => {
-      const normalizedLName = l.name.replace(/\(.*?\)/, "").trim().toLowerCase();
-      return normalizedLName === cleanName || l.name.toLowerCase().includes(cleanName) || cleanName.includes(normalizedLName);
-    });
-    if (found) {
-      mp3Url = `/audio/intro_${found.id}.mp3`;
+  // Lebih diutamakan penggunaan direct ID untuk menjamin 100% fail audio yang tepat dipanggil
+  if (letterId) {
+    if (lang === "ms") {
+      mp3Url = `/audio/intro_${letterId}.mp3`;
+    } else if (lang === "ar") {
+      mp3Url = `/audio/letter_${letterId}.mp3`;
     }
-  } else if (lang === "ar") {
-    // Cari huruf mengikut tulisan arab asli (contoh: "أ")
-    const found = HIJAIYAH_LETTERS.find(l => l.char === text || text.includes(l.char));
-    if (found) {
-      mp3Url = `/audio/letter_${found.id}.mp3`;
+  } else {
+    if (lang === "ms") {
+      // Cari huruf mengikut nama (contoh: "Huruf Alif")
+      const cleanName = text.replace("Huruf ", "").replace(/\(.*?\)/, "").trim().toLowerCase();
+      const found = HIJAIYAH_LETTERS.find(l => {
+        const normalizedLName = l.name.replace(/\(.*?\)/, "").trim().toLowerCase();
+        return normalizedLName === cleanName || l.name.toLowerCase().includes(cleanName) || cleanName.includes(normalizedLName);
+      });
+      if (found) {
+        mp3Url = `/audio/intro_${found.id}.mp3`;
+      }
+    } else if (lang === "ar") {
+      // Cari huruf mengikut tulisan arab asli (contoh: "أ")
+      const found = HIJAIYAH_LETTERS.find(l => l.char === text || text.includes(l.char));
+      if (found) {
+        mp3Url = `/audio/letter_${found.id}.mp3`;
+      }
     }
   }
 
-  // Jika tidak ditemui fail tempatan, gunakan Google Translate online langsung sebagai sandaran
+  // Jika tidak ditemui fail tempatan, gunakan baki API laluan tts pelayan tempatan kita (/api/tts)
   if (!mp3Url) {
     const targetLang = lang === "ar" ? "ar" : "ms";
-    mp3Url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${targetLang}&q=${encodeURIComponent(text)}`;
+    mp3Url = `/api/tts?lang=${targetLang}&text=${encodeURIComponent(text)}`;
   }
 
-  const audio = new Audio(mp3Url);
+  // Bina URl penuh (absolute URL) dengan asal-usul tetingkap (window.location.origin)
+  // bagi mengelakkan ralat penghuraian laluan di dalam persekitaran iFrame pralihat
+  const absoluteUrl = mp3Url.startsWith("http")
+    ? mp3Url
+    : window.location.origin + (mp3Url.startsWith("/") ? "" : "/") + mp3Url;
+
   let endedTriggered = false;
 
+  // Set timeout keselamatan selama 4.5 saat agar butang UI tidak tersekat (freeze/disabled) jika audio gagal bertindak balas
+  const safetyTimeout = setTimeout(() => {
+    console.warn("Had masa audio dicapai (safety timeout), membebaskan slot sebutan.");
+    handleEnd();
+  }, 4500);
+
   const handleEnd = () => {
+    if (safetyTimeout) {
+      clearTimeout(safetyTimeout);
+    }
     if (!endedTriggered) {
       endedTriggered = true;
+      if (currentPlayingAudio) {
+        currentPlayingAudio = null;
+      }
       if (onEnd) onEnd();
     }
   };
 
+  // Cuba memulakan audio standard SECARA SYNCHRONOUS dengan serta-merta
+  // Ini adalah kaedah TERBAIK dan PALING DIPERCAYAI untuk mematuhi sekatan gerakan pengguna (user gesture restrictions)
+  const audio = new Audio(absoluteUrl);
+  currentPlayingAudio = audio;
+
   audio.addEventListener("ended", handleEnd);
 
   audio.addEventListener("error", (e) => {
-    console.warn(`Gagal memuatkan MP3 daripada ${mp3Url}, mencuba suara kecerdasan sistem tempatan:`, e);
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      if (lang === "ar") {
-        utterance.lang = "ar-SA";
-        utterance.rate = 0.75;
-      } else {
-        utterance.lang = "ms-MY";
-        utterance.rate = 0.95;
+    console.warn(`Standard HTML5 Audio gagal memuatkan MP3 daripada ${absoluteUrl}. Cuba Web Audio API:`, e);
+    playMp3ViaWebAudio(absoluteUrl, handleEnd).then((success) => {
+      if (!success) {
+        console.warn("Web Audio API juga gagal. Melakukan sandaran terakhir kepada SpeechSynthesis.");
+        fallbackToSpeechSynthesis(text, lang, handleEnd);
       }
-      utterance.onend = handleEnd;
-      utterance.onerror = handleEnd;
-      window.speechSynthesis.speak(utterance);
-    } else {
-      handleEnd();
-    }
+    });
   });
 
-  audio.play().catch((err) => {
-    console.warn("Sekatan autoplay dikesan, menguji percakapan suara sistem:", err);
-    if ("speechSynthesis" in window) {
+  audio.play()
+    .then(() => {
+      console.log(`Standard HTML5 Audio berjaya dimulakan secara langsung dan serentak untuk: ${absoluteUrl}`);
+    })
+    .catch((err) => {
+      console.warn("Standard HTML5 .play() disekat oleh pelayar (autoplay policy). Cuba Web Audio API:", err);
+      playMp3ViaWebAudio(absoluteUrl, handleEnd).then((success) => {
+        if (!success) {
+          fallbackToSpeechSynthesis(text, lang, handleEnd);
+        }
+      });
+    });
+}
+
+function fallbackToSpeechSynthesis(text: string, lang: "ar" | "ms", handleEnd: () => void) {
+  if ("speechSynthesis" in window) {
+    try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
+      currentUtterance = utterance;
       if (lang === "ar") {
         utterance.lang = "ar-SA";
         utterance.rate = 0.75;
@@ -166,8 +280,11 @@ export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void) {
       utterance.onend = handleEnd;
       utterance.onerror = handleEnd;
       window.speechSynthesis.speak(utterance);
-    } else {
+    } catch (errSpeech) {
+      console.warn("SpeechSynthesis error:", errSpeech);
       handleEnd();
     }
-  });
+  } else {
+    handleEnd();
+  }
 }

@@ -14,6 +14,8 @@ interface AIEvaluatorProps {
   onBackToMenu?: () => void;
   addXp: (amount: number) => void;
   updateLetterMastery: (letterId: number, score: number) => void;
+  autoPlayOnMount?: boolean;
+  onClearAutoPlay?: () => void;
 }
 
 export default function AIEvaluator({
@@ -22,7 +24,9 @@ export default function AIEvaluator({
   onPrevLetter,
   onBackToMenu,
   addXp,
-  updateLetterMastery
+  updateLetterMastery,
+  autoPlayOnMount = false,
+  onClearAutoPlay
 }: AIEvaluatorProps) {
   const [isPlayingTts, setIsPlayingTts] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -48,7 +52,18 @@ export default function AIEvaluator({
     fetchAITips();
     setEvaluationResult(null);
     setTranscript("");
-  }, [letter]);
+
+    if (autoPlayOnMount) {
+      // Tunggu 500ms sedikit selepas page transition selesai agar pergerakan rasa lancar
+      const timer = setTimeout(() => {
+        handleTextToSpeech();
+      }, 500);
+      if (onClearAutoPlay) {
+        onClearAutoPlay();
+      }
+      return () => clearTimeout(timer);
+    }
+  }, [letter, autoPlayOnMount]);
 
   // Handle Speech Recognition setup
   useEffect(() => {
@@ -111,8 +126,8 @@ export default function AIEvaluator({
     playTTS(`Huruf ${letter.name}`, "ms", () => {
       playTTS(letter.char, "ar", () => {
         setIsPlayingTts(false);
-      });
-    });
+      }, letter.id);
+    }, letter.id);
   };
 
   const startVoiceRecording = () => {

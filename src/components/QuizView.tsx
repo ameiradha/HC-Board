@@ -114,14 +114,14 @@ export default function QuizView({
     // If "listen-choose", speak automatically!
     if (mode === "listen-choose") {
       setTimeout(() => {
-        speakWord(randomLetter.char);
+        speakWord(randomLetter.char, randomLetter.id);
       }, 400);
     }
   };
 
   // Speaks Arabic via high quality MP3 dynamically streamed from proxy API, with system-fallback
-  const speakWord = (char: string) => {
-    playTTS(char, "ar");
+  const speakWord = (char: string, letterId?: number) => {
+    playTTS(char, "ar", undefined, letterId);
   };
 
   const handleSubmitAnswer = (ans: string, mode: QuizType) => {
@@ -500,7 +500,7 @@ export default function QuizView({
                   {/* Play sound again node */}
                   <div className="flex justify-center">
                     <button
-                      onClick={() => speakWord(currentLetter.char)}
+                      onClick={() => speakWord(currentLetter.char, currentLetter.id)}
                       className="p-6 bg-indigo-500 hover:bg-indigo-600 text-white rounded-[32px] shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 group cursor-pointer"
                     >
                       <Volume2 className="w-8 h-8 group-hover:scale-110 transition-transform" />
