@@ -200,6 +200,11 @@ export function playTTS(text: string, lang: "ar" | "ms", onEnd?: () => void, let
     }
   }
 
+  // Tambah parameter cache-buster untuk memaksa pelayar web memuat turun fail audio yang dikemaskini tanpa menggunakan fail cached lama
+  if (mp3Url && mp3Url.startsWith("/audio/")) {
+    mp3Url += `?v=15`;
+  }
+
   // Jika tidak ditemui fail tempatan, gunakan baki API laluan tts pelayan tempatan kita (/api/tts)
   if (!mp3Url) {
     const targetLang = lang === "ar" ? "ar" : "ms";
