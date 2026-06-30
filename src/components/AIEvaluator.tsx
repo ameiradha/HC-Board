@@ -122,11 +122,9 @@ export default function AIEvaluator({
     playBeep();
     setIsPlayingTts(true);
 
-    // Sebut nama huruf dalam bahasa Melayu, kemudian sebut sebutan huruf Arab sebenar
-    playTTS(`Huruf ${letter.name}`, "ms", () => {
-      playTTS(letter.char, "ar", () => {
-        setIsPlayingTts(false);
-      }, letter.id);
+    // Sebut sebutan huruf Arab sebenar secara langsung tanpa sebutan awalan bahasa Melayu
+    playTTS(letter.char, "ar", () => {
+      setIsPlayingTts(false);
     }, letter.id);
   };
 

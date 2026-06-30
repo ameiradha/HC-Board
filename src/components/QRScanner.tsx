@@ -272,9 +272,7 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
                   }
                   
                   // Mainkan sebutan huruf secara lisan automatik sejurus dikesan
-                  playTTS(`Huruf ${found.name}`, "ms", () => {
-                    playTTS(found.char, "ar", undefined, found.id);
-                  }, found.id);
+                  playTTS(found.char, "ar", undefined, found.id);
 
                   onScannedRef.current(found);
                   stopCamera();
@@ -310,9 +308,7 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
   const triggerMockScan = (letter: HijaiyahLetter) => {
     playBeep();
     // Mainkan sebutan huruf secara lisan automatik sejurus dikesan
-    playTTS(`Huruf ${letter.name}`, "ms", () => {
-      playTTS(letter.char, "ar", undefined, letter.id);
-    }, letter.id);
+    playTTS(letter.char, "ar", undefined, letter.id);
     onScanned(letter);
   };
 
