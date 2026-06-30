@@ -73,10 +73,10 @@ export default function ProgressCharts({ masteryRecord, totalXp }: ProgressChart
               Dikuasai (Skor &ge; 80)
             </span>
             <h5 className="text-2xl font-black text-slate-800 leading-none mt-1">
-              {lettersMastered} / 29 <span className="text-xs text-slate-400 font-normal">Huruf</span>
+              {lettersMastered} / {HIJAIYAH_LETTERS.length} <span className="text-xs text-slate-400 font-normal">Huruf</span>
             </h5>
             <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-              Kuasai semua 29 huruf Hijaiyah utama untuk mendapatkan pingat emas!
+              Kuasai semua {HIJAIYAH_LETTERS.length} huruf Hijaiyah utama untuk mendapatkan pingat emas!
             </p>
           </div>
         </div>

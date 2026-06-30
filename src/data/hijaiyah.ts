@@ -310,6 +310,17 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   },
   {
     id: 28,
+    char: "لا",
+    name: "Lam Alif",
+    phonemic: "Laa",
+    makhrajRule: "Gabungan huruf Lam dan Alif. Dibaca panjang 2 harakat dengan aliran udara lancar di tepi lidah.",
+    metaphor: "Gabungan dua pemegang payung atau dua batang kayu yang saling bersilang mesra!",
+    exampleWord: "لَا",
+    exampleTrans: "Laa",
+    exampleMeaning: "Tidak"
+  },
+  {
+    id: 29,
     char: "ء",
     name: "Hamzah",
     phonemic: "' (Hentian)",
@@ -320,7 +331,7 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
     exampleMeaning: "Air"
   },
   {
-    id: 29,
+    id: 30,
     char: "ي",
     name: "Ya",
     phonemic: "Y",

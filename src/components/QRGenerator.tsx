@@ -170,7 +170,7 @@ export default function QRGenerator() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
         doc.setTextColor(148, 163, 184); // slate-400
-        doc.text(`Imbas QR di atas dalam Web App untuk menguji sebutan serta-merta  |  Keping ${letter.id} / 29`, 105, 273, { align: "center" });
+        doc.text(`Imbas QR di atas dalam Web App untuk menguji sebutan serta-merta  |  Keping ${letter.id} / ${HIJAIYAH_LETTERS.length}`, 105, 273, { align: "center" });
       }
 
       // Save PDF
@@ -245,7 +245,7 @@ export default function QRGenerator() {
             Muat Turun &amp; Cetak Kad QR Hijaiyah 🖨️
           </h3>
           <p className="text-slate-500 text-xs mt-1 leading-relaxed max-w-xl">
-            Cipta kad fizikal bercetak untuk murid di rumah atau kelas! Anda boleh mencetak terus atau memuat turun **fail PDF Kekal (Satu Huruf Sepos, 29 Muka Surat)** secara percuma yang dijamin tidak akan tamat tempoh dan boleh diimbas selamanya.
+            Cipta kad fizikal bercetak untuk murid di rumah atau kelas! Anda boleh mencetak terus atau memuat turun **fail PDF Kekal (Satu Huruf Sepos, {HIJAIYAH_LETTERS.length} Muka Surat)** secara percuma yang dijamin tidak akan tamat tempoh dan boleh diimbas selamanya.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
@@ -259,7 +259,7 @@ export default function QRGenerator() {
             } text-white font-extrabold text-xs rounded-full transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer`}
           >
             <FileDown className="w-4 h-4" /> 
-            {isGeneratingPdf ? "Menjana PDF..." : "Muat Turun PDF Kad (29 Page)"}
+            {isGeneratingPdf ? "Menjana PDF..." : `Muat Turun PDF Kad (${HIJAIYAH_LETTERS.length} Page)`}
           </button>
           <button
             onClick={handlePrintAll}
@@ -273,7 +273,7 @@ export default function QRGenerator() {
       {/* Print target Container layout */}
       <div id="print-area-only" className="bg-slate-50 rounded-3xl p-6 border border-slate-100 shadow-xl">
         <div className="mb-6 flex items-center justify-between no-print">
-          <span className="text-xs font-bold text-slate-500">Jumlah: 29 Kad QR Sedia Dicetak</span>
+          <span className="text-xs font-bold text-slate-500">Jumlah: {HIJAIYAH_LETTERS.length} Kad QR Sedia Dicetak</span>
           <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full font-bold">Cetak A4 Sesuai</span>
         </div>
 

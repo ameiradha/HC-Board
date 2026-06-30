@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { HijaiyahLetter } from "../data/hijaiyah";
+import { HijaiyahLetter, HIJAIYAH_LETTERS } from "../data/hijaiyah";
 import { playBeep, playSuccess, playFail, playClick, playTTS } from "../utils/audio";
 import { 
   Volume2, Mic, MicOff, Star, Sparkles, Award, Zap, RefreshCw, 
@@ -220,7 +220,7 @@ export default function AIEvaluator({
           {/* Header of the active card */}
           <div className="bg-gradient-to-r from-sky-500 to-sky-600 p-5 sm:p-6 flex justify-between items-center text-white">
             <span className="font-display font-black text-sm uppercase tracking-widest text-sky-100">
-              HURUF {letter.id} DARIPADA 29
+              HURUF {letter.id} DARIPADA {HIJAIYAH_LETTERS.length}
             </span>
             <span className="bg-sky-400/50 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-bold font-display">
               H.C BOARD

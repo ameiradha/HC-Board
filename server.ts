@@ -111,6 +111,7 @@ function getLocalCoachEvaluation(
     "nun": ["nun", "noon", "na", "nah", "ne", "نون", "نو", "ن"],
     "waw": ["waw", "wau", "wo", "wah", "wa", "واو", "وا", "و"],
     "ha (besar)": ["hah", "ha", "he", "hea", "ha besar", "besar", "هاء", "ها", "ه"],
+    "lam alif": ["lam alif", "la alif", "lamalif", "laa alif", "laa", "la", "لام الف", "لا"],
     "hamzah": ["hamzah", "hamza", "amza", "همزة", "همزه", "ء"],
     "ya": ["ya", "yah", "ye", "yaa", "ياء", "يا", "ي"]
   };
@@ -360,6 +361,10 @@ const OFFLINE_MAPPING: Record<string, { metaphor: string; funTip: string }> = {
   "ha (besar)": {
     metaphor: "Seperti ribbon hiasan hadiah besar yang melengkung gembira!",
     funTip: "Sebutkan Ha dalam-dalam dari dada seperti ketawa gembira yang ikhlas!"
+  },
+  "lam alif": {
+    metaphor: "Gabungan dua pemegang payung atau dua batang kayu yang saling bersilang mesra!",
+    funTip: "Sebutkan Lam Alif dengan lembut dan pastikan anda panjangkan bunyinya sebanyak 2 harakat: Laaa!"
   },
   hamzah: {
     metaphor: "Burung layang-layang kecil yang meluncur bebas di langit biru!",
