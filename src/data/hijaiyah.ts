@@ -80,12 +80,12 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   {
     id: 7,
     char: "خ",
-    name: "Kha",
-    phonemic: "Kh",
+    name: "Kho",
+    phonemic: "Kho",
     makhrajRule: "Tenggorokan bahagian atas dekat mulut. Berbunyi kasar seperti berdehem.",
     metaphor: "Seperti bumbung perut buncit yang diletakkan satu mahkota bintik di atas kepalanya!",
     exampleWord: "خَرُوفٌ",
-    exampleTrans: "Kharufun",
+    exampleTrans: "Khorufun",
     exampleMeaning: "Kambing Biri-biri"
   },
   {
@@ -124,7 +124,7 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   {
     id: 11,
     char: "ز",
-    name: "Za",
+    name: "Zai",
     phonemic: "Z",
     makhrajRule: "Hujung lidah berhampiran gigi kacip bawah dengan bunyi mendesing.",
     metaphor: "Seperti papan gelongsor ra juga, tetapi ada sebiji bola mainan di atasnya!",
@@ -157,7 +157,7 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   {
     id: 14,
     char: "ص",
-    name: "Sod",
+    name: "Shad",
     phonemic: "Sh",
     makhrajRule: "Sebutan tebal dari hujung lidah menyentuh dinding dalam gigi kacip bawah.",
     metaphor: "Baling-baling yang bulat tumpul bersambung dengan mangkuk panjang!",
@@ -179,7 +179,7 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   {
     id: 16,
     char: "ط",
-    name: "Tho",
+    name: "Tha",
     phonemic: "Th",
     makhrajRule: "Hujung lidah melekat tebal ke pangkal gigi kacip atas (sebutan tebal).",
     metaphor: "Seperti helikopter kecil dengan sebilah tiub udara menegak tinggi ke langit!",
@@ -190,7 +190,7 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   {
     id: 17,
     char: "ظ",
-    name: "Zho",
+    name: "Dha",
     phonemic: "Zh",
     makhrajRule: "Hujung lidah bertemu hujung gigi kacip atas dengan nada tebal.",
     metaphor: "Helikopter tho tetapi kini ada bintik radar yang menyala di sebelahnya!",
@@ -212,7 +212,7 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   {
     id: 19,
     char: "غ",
-    name: "Ghoin",
+    name: "Ghain",
     phonemic: "Gh",
     makhrajRule: "Tenggorokan bahagian atas (Adnal Halqi). Seperti berkumur basah kental.",
     metaphor: "Bentuk telinga bunian dengan setitik hiasan butang subang di atas puncak telinga!",
@@ -300,7 +300,7 @@ export const HIJAIYAH_LETTERS: HijaiyahLetter[] = [
   {
     id: 27,
     char: "ه",
-    name: "Ha (Besar)",
+    name: "Hha",
     phonemic: "H",
     makhrajRule: "Pangkal tenggorokan paling dalam dekat dada. Bernafas dalam.",
     metaphor: "Seperti ribbon hiasan hadiah besar yang melengkung gembira!",

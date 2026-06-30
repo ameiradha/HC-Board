@@ -90,27 +90,27 @@ function getLocalCoachEvaluation(
     "tsa": ["tsa", "tsah", "sa", "sah", "tha", "thah", "ثاء", "ثا", "ث"],
     "jim": ["jim", "jeem", "je", "gim", "جym", "جيم", "جي", "ج"],
     "ha": ["ha", "hah", "haa", "حاء", "حا", "ح"],
-    "kha": ["kha", "khah", "kho", "khoh", "ko", "koh", "خاء", "خا", "خ"],
+    "kho": ["kho", "khoh", "kha", "khah", "ko", "koh", "خاء", "خا", "خ"],
     "dal": ["dal", "dah", "deel", "da", "دal", "دال", "da", "د"],
     "dzal": ["dzal", "zal", "zhal", "zaa", "za", "ذال", "ذا", "ذ"],
     "ro": ["ro", "ra", "rah", "re", "aro", "راء", "را", "ر"],
-    "za": ["za", "zai", "zay", "zei", "ze", "زاء", "زاي", "زا", "ز"],
+    "zai": ["zai", "za", "zay", "zei", "ze", "زاء", "زاي", "زا", "ز"],
     "sin": ["sin", "seen", "se", "ssin", "سين", "سي", "س"],
     "syin": ["syin", "sheen", "shin", "shyn", "sye", "شين", "شي", "ش"],
-    "sod": ["sod", "shod", "sad", "shor", "صاد", "صا", "ص"],
+    "shad": ["shad", "shod", "sad", "shor", "sod", "صاد", "صا", "ص"],
     "dhod": ["dhod", "dad", "dod", "dhad", "daa", "ضاد", "ضا", "ض"],
-    "tho": ["tho", "thoh", "to", "toh", "طاء", "طا", "ط"],
-    "zho": ["zho", "zoh", "zo", "ظاء", "ظا", "ظ"],
+    "tha": ["tha", "tho", "thoh", "to", "toh", "ta", "tah", "طاء", "طا", "ط"],
+    "dha": ["dha", "zho", "zoh", "zo", "da", "dhor", "dha", "ظاء", "ظa", "ظ"],
     "ain": ["ain", "ayn", "in", "aen", "عين", "عي", "ع"],
-    "ghoin": ["ghoin", "ghayn", "goin", "gho", "gha", "غين", "غي", "غ"],
+    "ghain": ["ghain", "ghoin", "ghayn", "goin", "gho", "gha", "غin", "غين", "غي", "غ"],
     "fa": ["fa", "fah", "fe", "pa", "pah", "فاء", "فا", "ف"],
     "qof": ["qof", "qaf", "ko", "kof", "qo", "قاف", "قا", "ق"],
     "kaf": ["kaf", "ka", "kah", "ke", "كaf", "كاف", "كا", "ك"],
     "lam": ["lam", "la", "lh", "le", "لام", "لا", "ل"],
     "mim": ["mim", "meem", "me", "ma", "mah", "ميم", "مي", "م"],
     "nun": ["nun", "noon", "na", "nah", "ne", "نون", "نو", "ن"],
-    "waw": ["waw", "wau", "wo", "wah", "wa", "واو", "وا", "و"],
-    "ha (besar)": ["hah", "ha", "he", "hea", "ha besar", "besar", "هاء", "ها", "ه"],
+    "wau": ["wau", "waw", "wo", "wah", "wa", "واو", "وا", "و"],
+    "hha": ["hha", "hah", "ha", "he", "hea", "ha besar", "besar", "hha", "ha besar", "هاء", "ها", "ه"],
     "lam alif": ["lam alif", "la alif", "lamalif", "laa alif", "laa", "la", "لام الف", "لا"],
     "hamzah": ["hamzah", "hamza", "amza", "همزة", "همزه", "ء"],
     "ya": ["ya", "yah", "ye", "yaa", "ياء", "يا", "ي"]
@@ -207,7 +207,7 @@ app.post("/api/evaluate", async (req, res) => {
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
-        systemInstruction: "Anda adalah guru pakar AI yang mahir dalam tajwid terutamanya makhraj huruf Hijaiyah untuk kanak-kanak di Malaysia. Anda memberikan penilaian yang positif, bermotivasi tinggi, dan ramah.",
+        systemInstruction: "Anda adalah guru pakar AI yang mahir dalam tajwid terutamanya makhraj huruf Hijaiyah untuk kanak-kanak di Malaysia. Anda memberikan penilaian yang positif, bermotivasi tinggi, dan ramah. PENTING: Anda MESTI menggunakan ejaan nama huruf yang diberikan dalam parameter 'expectedName' sepenuhnya di dalam ulasan maklum balas dan tips anda. CONTOH: Gunakan 'Kho' (Bukan 'Kha'), 'Ro' (Bukan 'Ra'), 'Zai' (Bukan 'Za'), 'Shad' (Bukan 'Sod'), 'Tha' (Bukan 'Tho'), 'Dha' (Bukan 'Zho'), 'Ghain' (Bukan 'Ghoin'), dan 'Hha' (Bukan 'Ha'). Jangan sesekali menyebut perkataan 'Kha' untuk huruf Kho.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -278,9 +278,9 @@ const OFFLINE_MAPPING: Record<string, { metaphor: string; funTip: string }> = {
     metaphor: "Like a cold breath on a mirror, clean and sweet!",
     funTip: "Seolah menghembus nafas segar selepas minum air hangat yang bersih."
   },
-  kha: {
+  kho: {
     metaphor: "Seperti bumbung perut buncit yang diletakkan satu mahkota bintik di atas kepalanya!",
-    funTip: "Ucapkan Kha dengan bunyi sedikit kasar seolah-olah sedang membersihkan tekak!"
+    funTip: "Ucapkan Kho dengan bunyi sedikit kasar seolah-olah sedang membersihkan tekak!"
   },
   dal: {
     metaphor: "Seperti pintu gua kecil yang condong atau tangan yang sedang melengkung mesra!",
@@ -294,9 +294,9 @@ const OFFLINE_MAPPING: Record<string, { metaphor: string; funTip: string }> = {
     metaphor: "Bentuk bulan sabit yang tajam atau papan gelongsor taman permainan yang laju!",
     funTip: "Getarkan lidah anda dengan bertenaga untuk menyebut Ro dengan megah!"
   },
-  za: {
+  zai: {
     metaphor: "Seperti papan gelongsor ra juga, tetapi ada sebiji bola mainan di atasnya!",
-    funTip: "Sebutkan Za dengan bunyi mendesing seperti seekor lebah comel yang terbang!"
+    funTip: "Sebutkan Zai dengan bunyi mendesing seperti seekor lebah comel yang terbang!"
   },
   sin: {
     metaphor: "Seperti gigi sisir kecil yang bergigi tiga dengan mangkuk besar di tepi!",
@@ -306,29 +306,29 @@ const OFFLINE_MAPPING: Record<string, { metaphor: string; funTip: string }> = {
     metaphor: "Seperti sisir sin yang mempunyai tiga bintang berkilauan di atasnya!",
     funTip: "Embuskan nafas yang lebar seperti menyuruh seseorang diam: Syyyh!"
   },
-  sod: {
+  shad: {
     metaphor: "Baling-baling yang bulat tumpul bersambung dengan mangkuk panjang!",
-    funTip: "Sebutkan Sod dengan memenuhkan mulut anda agar bunyinya tebal perkasa!"
+    funTip: "Sebutkan Shad dengan memenuhkan mulut anda agar bunyinya tebal perkasa!"
   },
   dhod: {
-    metaphor: "Sama seperti sod, tetapi diketemukan setitik intan mutiara di atas badannya!",
+    metaphor: "Sama seperti shad, tetapi diketemukan setitik intan mutiara di atas badannya!",
     funTip: "Tekan tepi lidah ke gigi geraham untuk bunyi Dhod yang mantap!"
   },
-  tho: {
+  tha: {
     metaphor: "Seperti helikopter kecil dengan sebilah tiub udara menegak tinggi ke langit!",
-    funTip: "Ketuk hujung lidah ke lelangit atas dengan kuat untuk bunyi Tho tebal!"
+    funTip: "Ketuk hujung lidah ke lelangit atas dengan kuat untuk bunyi Tha tebal!"
   },
-  zho: {
-    metaphor: "Helikopter tho tetapi kini ada bintik radar yang menyala di sebelahnya!",
-    funTip: "Sebutkan Zho dengan nada tebal berserta sentuhan lembut hujung lidah!"
+  dha: {
+    metaphor: "Helikopter tha tetapi kini ada bintik radar yang menyala di sebelahnya!",
+    funTip: "Sebutkan Dha dengan nada tebal berserta sentuhan lembut hujung lidah!"
   },
   ain: {
     metaphor: "Seperti telinga dongeng bunian yang melengkung kemas ke bawah!",
     funTip: "Tekan sedikit bahagian tengah kerongkong anda untuk melafazkan Ain yang lunak!"
   },
-  ghoin: {
+  ghain: {
     metaphor: "Bentuk telinga bunian dengan setitik hiasan butang subang di atas puncak telinga!",
-    funTip: "Sebutkan Ghoin dengan melafazkan bunyi seakan berkumur-kumur!"
+    funTip: "Sebutkan Ghain dengan melafazkan bunyi seakan berkumur-kumur!"
   },
   fa: {
     metaphor: "Gelung bulat kecil seperti ekor anjing laut dengan satu bola terapung di atas muncungnya!",
@@ -358,9 +358,9 @@ const OFFLINE_MAPPING: Record<string, { metaphor: string; funTip: string }> = {
     metaphor: "Seperti siput cengkerang kecil yang meluncur membawa kail atau ekor panjang!",
     funTip: "Muncungkan mulut anda sepenuhnya hingga membentuk bulatan kecil: Wau!"
   },
-  "ha (besar)": {
+  hha: {
     metaphor: "Seperti ribbon hiasan hadiah besar yang melengkung gembira!",
-    funTip: "Sebutkan Ha dalam-dalam dari dada seperti ketawa gembira yang ikhlas!"
+    funTip: "Sebutkan Hha dalam-dalam dari dada seperti ketawa gembira yang ikhlas!"
   },
   "lam alif": {
     metaphor: "Gabungan dua pemegang payung atau dua batang kayu yang saling bersilang mesra!",
