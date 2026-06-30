@@ -366,7 +366,7 @@ export default function App() {
           {/* Logo Name & Icon Box with 3D feel */}
           <div className="flex items-center gap-3">
             <img 
-              src="https://drive.google.com/thumbnail?id=18GgtZyH2xq-2r3OzhDxRC-e3eTmIBw9z&sz=w1000" 
+              src="https://drive.google.com/thumbnail?id=1gDAeJay10ZiuyjUXc-w-wK0sCVZCyRU7&sz=w1000" 
               alt="Logo Jom Belajar Hijaiyah AI" 
               className="w-9 h-9 object-contain rounded-xl shadow-sm shrink-0"
               referrerPolicy="no-referrer"
