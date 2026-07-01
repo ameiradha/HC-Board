@@ -7,6 +7,88 @@ import QRGenerator from "./QRGenerator";
 // @ts-ignore
 import jsQR from "jsqr";
 
+// Resilient mapping function to handle both old and new QR code spellings/names seamlessly
+export function getLetterFromScannedName(letterName: string): HijaiyahLetter | undefined {
+  const normalized = letterName.trim().toLowerCase();
+  
+  const oldNamesMap: Record<string, number> = {
+    // Ghain
+    "ghoin": 19,
+    "ghain": 19,
+    "gho": 19,
+    
+    // Nun
+    "nun": 25,
+    "noon": 25,
+    
+    // Ha (big 'ه', ID 27)
+    "hha": 27,
+    "ha_besar": 27,
+    "ha-besar": 27,
+    "habesar": 27,
+    "he": 27,
+    "heh": 27,
+    "ha besar": 27,
+    
+    // Kho
+    "kha": 7,
+    "kho": 7,
+    "khoh": 7,
+    "khah": 7,
+    
+    // To / Tho / Tha
+    "to": 16,
+    "tho": 16,
+    "thoh": 16,
+    "toh": 16,
+    "tha": 16,
+    
+    // Zo / Zho / Dha
+    "zo": 17,
+    "zho": 17,
+    "zoh": 17,
+    "dha": 17,
+    
+    // Sod / Shad
+    "sod": 14,
+    "shad": 14,
+    
+    // Other helper letters to ensure robust matching of older cards
+    "ra": 10,
+    "ro": 10,
+    "za": 11,
+    "zai": 11,
+    "haa": 6,
+    "ha_kecil": 6,
+    "hakecil": 6,
+    "ha kecil": 6,
+  };
+
+  // 1. If there's an explicit alias in our map, use it
+  if (normalized in oldNamesMap) {
+    const id = oldNamesMap[normalized];
+    return HIJAIYAH_LETTERS.find(l => l.id === id);
+  }
+
+  // 2. Direct case-insensitive match on current name
+  let found = HIJAIYAH_LETTERS.find(l => l.name.toLowerCase() === normalized);
+  if (found) return found;
+
+  // 3. Check if current name is part of the string or vice-versa
+  found = HIJAIYAH_LETTERS.find(l => 
+    l.name.toLowerCase().includes(normalized) || 
+    normalized.includes(l.name.toLowerCase())
+  );
+  if (found) return found;
+
+  // 4. Special fallback for "ha" which defaults to ID 6 (Ha / ح)
+  if (normalized === "ha") {
+    return HIJAIYAH_LETTERS.find(l => l.id === 6);
+  }
+
+  return undefined;
+}
+
 interface QRScannerProps {
   onScanned: (letter: HijaiyahLetter) => void;
   titleOverride?: string;
@@ -264,7 +346,7 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
               console.log("Kod QR berjaya diimbas:", code.data);
               if (code.data.startsWith("hijaiyah:")) {
                 const letterName = code.data.replace("hijaiyah:", "").trim().toLowerCase();
-                const found = HIJAIYAH_LETTERS.find(l => l.name.toLowerCase() === letterName);
+                const found = getLetterFromScannedName(letterName);
                 if (found) {
                   playBeep();
                   if (navigator.vibrate) {
