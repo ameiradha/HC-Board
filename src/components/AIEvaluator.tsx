@@ -282,18 +282,7 @@ export default function AIEvaluator({
               </p>
             </div>
 
-            {/* Words Examples Dashboard with beautiful layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full bg-white border-2 border-slate-50 p-4 rounded-2xl mb-8 shadow-sm">
-              <div className="sm:border-r border-slate-100 sm:pr-4 flex flex-col justify-center">
-                <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider font-display">Contoh Kalimah</span>
-                <span className="text-2xl font-black text-slate-800 tracking-wide font-sans mt-0.5">{letter.exampleWord}</span>
-              </div>
-              <div className="sm:pl-4 flex flex-col justify-center border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0">
-                <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider font-display">Sebutan & Arti</span>
-                <span className="text-sm font-black text-sky-600 font-display">{letter.exampleTrans}</span>
-                <span className="text-xs text-slate-500">Maksud: {letter.exampleMeaning}</span>
-              </div>
-            </div>
+            {/* Halaman Contoh Kalimah dan Sebutan & Arti disembunyikan mengikut permintaan pengguna */}
 
             {/* Trigger actions */}
             <div className="w-full border-t border-slate-100 pt-6">
