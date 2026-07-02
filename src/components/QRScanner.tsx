@@ -11,15 +11,34 @@ import jsQR from "jsqr";
 export function getLetterFromScannedName(letterName: string): HijaiyahLetter | undefined {
   const normalized = letterName.trim().toLowerCase();
   
+  // Clean Arabic helper
+  const cleanArabic = (text: string) => {
+    return text
+      .replace(/[\u064B-\u065F]/g, "") // remove harakat / diacritics
+      .replace(/\u0640/g, "")         // remove kashida (tatweel)
+      .trim();
+  };
+
+  const cleanedInput = cleanArabic(normalized);
+
+  // 1. Check direct Arabic character match (with and without diacritics/kashida)
+  const arabicMatch = HIJAIYAH_LETTERS.find(l => {
+    const cleanedChar = cleanArabic(l.char);
+    return cleanedChar === cleanedInput || l.char === normalized;
+  });
+  if (arabicMatch) return arabicMatch;
+
   const oldNamesMap: Record<string, number> = {
     // Ghain
     "ghoin": 19,
     "ghain": 19,
     "gho": 19,
+    "غ": 19,
     
     // Nun
     "nun": 25,
     "noon": 25,
+    "ن": 25,
     
     // Ha (big 'ه', ID 27)
     "hha": 27,
@@ -29,12 +48,17 @@ export function getLetterFromScannedName(letterName: string): HijaiyahLetter | u
     "he": 27,
     "heh": 27,
     "ha besar": 27,
+    "ه": 27,
+    "هـ": 27,
     
     // Kho
     "kha": 7,
     "kho": 7,
     "khoh": 7,
     "khah": 7,
+    "kh": 7,
+    "khô": 7,
+    "خ": 7,
     
     // To / Tho / Tha
     "to": 16,
@@ -42,16 +66,21 @@ export function getLetterFromScannedName(letterName: string): HijaiyahLetter | u
     "thoh": 16,
     "toh": 16,
     "tha": 16,
+    "ط": 16,
     
     // Zo / Zho / Dha
     "zo": 17,
     "zho": 17,
     "zoh": 17,
     "dha": 17,
+    "ظ": 17,
     
     // Sod / Shad
     "sod": 14,
     "shad": 14,
+    "shod": 14,
+    "so": 14,
+    "ص": 14,
     
     // Other helper letters to ensure robust matching of older cards
     "ra": 10,
@@ -64,24 +93,24 @@ export function getLetterFromScannedName(letterName: string): HijaiyahLetter | u
     "ha kecil": 6,
   };
 
-  // 1. If there's an explicit alias in our map, use it
+  // 2. If there's an explicit alias in our map, use it
   if (normalized in oldNamesMap) {
     const id = oldNamesMap[normalized];
     return HIJAIYAH_LETTERS.find(l => l.id === id);
   }
 
-  // 2. Direct case-insensitive match on current name
+  // 3. Direct case-insensitive match on current name
   let found = HIJAIYAH_LETTERS.find(l => l.name.toLowerCase() === normalized);
   if (found) return found;
 
-  // 3. Check if current name is part of the string or vice-versa
+  // 4. Check if current name is part of the string or vice-versa
   found = HIJAIYAH_LETTERS.find(l => 
     l.name.toLowerCase().includes(normalized) || 
     normalized.includes(l.name.toLowerCase())
   );
   if (found) return found;
 
-  // 4. Special fallback for "ha" which defaults to ID 6 (Ha / ح)
+  // 5. Special fallback for "ha" which defaults to ID 6 (Ha / ح)
   if (normalized === "ha") {
     return HIJAIYAH_LETTERS.find(l => l.id === 6);
   }
@@ -344,24 +373,25 @@ export default function QRScanner({ onScanned, titleOverride }: QRScannerProps) 
 
             if (code && code.data) {
               console.log("Kod QR berjaya diimbas:", code.data);
-              if (code.data.startsWith("hijaiyah:")) {
-                const letterName = code.data.replace("hijaiyah:", "").trim().toLowerCase();
-                const found = getLetterFromScannedName(letterName);
-                if (found) {
-                  playBeep();
-                  if (navigator.vibrate) {
-                    try { navigator.vibrate(200); } catch (e) {}
-                  }
-                  
-                  // Mainkan sebutan huruf secara lisan automatik sejurus dikesan
-                  playTTS(found.char, "ar", undefined, found.id);
-
-                  onScannedRef.current(found);
-                  stopCamera();
-                  setUseSimulated(true);
-                  active = false;
-                  return;
+              let letterName = code.data.trim();
+              if (letterName.toLowerCase().startsWith("hijaiyah:")) {
+                letterName = letterName.substring(9).trim();
+              }
+              const found = getLetterFromScannedName(letterName);
+              if (found) {
+                playBeep();
+                if (navigator.vibrate) {
+                  try { navigator.vibrate(200); } catch (e) {}
                 }
+                
+                // Mainkan sebutan huruf secara lisan automatik sejurus dikesan
+                playTTS(found.char, "ar", undefined, found.id);
+
+                onScannedRef.current(found);
+                stopCamera();
+                setUseSimulated(true);
+                active = false;
+                return;
               }
             }
           } catch (err) {

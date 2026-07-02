@@ -367,13 +367,13 @@ export default function App() {
           <div className="flex items-center gap-3">
             <img 
               src="https://drive.google.com/thumbnail?id=1gDAeJay10ZiuyjUXc-w-wK0sCVZCyRU7&sz=w1000" 
-              alt="Logo Jom Belajar Hijaiyah AI" 
+              alt="Logo AI Smart Hijaiyah" 
               className="w-9 h-9 object-contain rounded-xl shadow-sm shrink-0"
               referrerPolicy="no-referrer"
             />
             <div>
               <h1 className="text-sm font-display font-black text-slate-800 uppercase tracking-tight leading-none sm:text-base">
-                Jom Belajar Hijaiyah AI
+                AI Smart Hijaiyah
               </h1>
               <span className="text-[10px] text-sky-600 font-extrabold tracking-wider font-display uppercase block mt-0.5">
                 H.C Board
@@ -500,7 +500,7 @@ export default function App() {
 
           {/* Informative footer */}
           <footer className="mt-12 text-center text-slate-450 text-[10px] font-display font-extrabold no-print py-5 border-t-2 border-sky-100/60 pl-4 sm:pl-0">
-            Hak Cipta Terpelihara &copy; 2026 - Jom Belajar Huruf Hijaiyah AI (H.C Board)
+            Hak Cipta Terpelihara &copy; 2026 - AI Smart Hijaiyah (HC Board)
           </footer>
         </main>
 
