@@ -191,15 +191,20 @@ app.post("/api/evaluate", async (req, res) => {
 
     const ai = getGemini();
     const prompt = `
-      Sila nilaikan sebutan murid prasekolah/sekolah rendah yang menyebut huruf Hijaiyah berikut:
+      Sila nilaikan sebutan murid prasekolah/sekolah rendah yang menyebut huruf Hijaiyah berikut secara sangat teliti dan logik:
       Huruf Sasaran: "${letter}" (Nama: ${expectedName})
       Penerangan Makhraj Standard: ${makhrajRule || "Sila huraikan mengikut asas tajwid"}
       Teks Sebutan Murid Rekod (Speech-to-Text): "${transcript || ""}"
 
-      TUGAS:
+      TUGAS PENILAIAN YANG LOGIK:
       Bandingkan teks sebutan murid ("${transcript}") dengan nama huruf "${expectedName}" atau huruf "${letter}" dalam bahasa Arab.
-      Jika transkrip kosong atau tiada (e.g. murid senyap), sila berikan motivasi lembut untuk mencuba lagi dengan skor penglibatan kecil (cth. 60%).
-      Jika transkrip sepadan secara fonetik dengan bunyi huruf, berikan skor yang tinggi.
+      
+      Peraturan Skor:
+      1. SANGAT TIDAK SEPADAN / SALAH SEBUT: Sekiranya transkrip mengandungi perkataan atau sebutan yang salah atau tidak berkaitan langsung dengan huruf sasaran (contohnya menyebut benda lain, perkataan lain seperti "makan", "salah", "buku" dsb semasa sasaran adalah "${expectedName}"), berikan skor yang sangat rendah secara logik iaitu di antara 10% hingga 35%. Jangan berikan markah lulus (bawah 40%). Maklum balas harus menyebut bahawa sebutan yang dikesan adalah berbeza secara mesra.
+      2. KOSONG / DI_AM: Sekiranya transkrip kosong, "mendengar...", atau murid senyap, berikan skor penglibatan yang sangat rendah di antara 5% hingga 15% sahaja dengan motivasi ceria untuk mencuba.
+      3. SEPARA TEPAT: Sekiranya sebutan agak dekat atau mengandungi bunyi yang hampir serupa tetapi tidak sempurna, berikan skor sederhana di antara 40% hingga 75%.
+      4. SANGAT TEPAT / CEMERLANG: Sekiranya sebutan adalah tepat atau sepadan secara fonetik dengan bunyi huruf, berikan skor yang cemerlang di antara 80% hingga 100%.
+
       Sediakan maklum balas interaktif yang ringkas, ceria, penuh kasih sayang, dalam Bahasa Melayu, mesra kanak-kanak (gunakan gelaran mesra seperti 'Wah, hebatnya anak pintar!' atau 'Syabas murid bijak!').
     `;
 
@@ -214,11 +219,11 @@ app.post("/api/evaluate", async (req, res) => {
           properties: {
             score: { 
               type: Type.INTEGER, 
-              description: "Skor peratusan sebutan dari 60 hingga 100 berdasarkan ketepatan transkrip dengan huruf sasaran." 
+              description: "Skor peratusan sebutan dari 0 hingga 100 berdasarkan ketepatan transkrip dengan huruf sasaran. Berikan skor di bawah 40 (cth: 10-35) jika transkrip tidak berkaitan langsung atau salah sebutan." 
             },
             stars: { 
               type: Type.INTEGER, 
-              description: "Bintang dari 1 hingga 5 ditentukan dari skor (90-100 = 5, 80-89 = 4, 70-79 = 3, 60-69 = 2, had bawah = 1)." 
+              description: "Bintang dari 1 hingga 5 ditentukan dari skor (90-100 = 5, 80-89 = 4, 70-79 = 3, 40-69 = 2, di bawah 40 = 1)." 
             },
             feedback: { 
               type: Type.STRING, 
