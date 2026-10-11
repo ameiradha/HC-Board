@@ -3,13 +3,15 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { HIJAIYAH_LETTERS } from "./src/data/hijaiyah";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+// Rakaman audio dihantar sebagai base64 (WAV 16kHz, ~160KB/5 saat) - had lalai 100kb tidak mencukupi
+app.use(express.json({ limit: "10mb" }));
 
 // Hidangkan folder /audio dan public secara langsung oleh Express dengan pengepala CORS
 app.use("/audio", express.static(path.join(process.cwd(), "public/audio"), {
@@ -44,216 +46,178 @@ function getGemini(): GoogleGenAI {
   return aiInstance;
 }
 
-// Fungsi pembantu untuk membina maklum balas sebutan pintar tempatan apabila Gemini API mengalami ralat kuota (429) atau ralat sambungan
-function getLocalCoachEvaluation(
-  letter: string, 
-  transcript: string, 
-  expectedName: string, 
-  makhrajRule: string, 
-  errorReason: string
-) {
-  const rawSpeech = (transcript || "").toLowerCase().trim();
-  
-  // Clean speech: buang perkataan hiasan, arahan atau kata hubung khas Melayu
-  const speech = rawSpeech
-    .replace(/\b(sebut|huruf|bunyi|baca|saya|ini|ialah|adalah|itu|nak|dan|atau|lah)\b/gi, "")
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
-    .trim();
+// ---------------------------------------------------------------------------
+// PENILAIAN SEBUTAN (berasaskan AUDIO sebenar, bukan teks speech-to-text)
+//
+// Kenapa audio? Speech-to-text pelayar (terutamanya Safari iPhone) cuba "meneka perkataan"
+// dan hampir tidak boleh mengecam bunyi huruf tunggal seperti "Tsa" atau "Dhod".
+// Di sini Gemini mendengar rakaman sebenar dan MESTI memilih huruf yang didengarinya daripada
+// senarai 30 huruf. Skor akhir dikira oleh KOD kita (bukan dipilih bebas oleh AI) supaya
+// sebutan yang salah tidak mungkin mendapat skor tinggi.
+// ---------------------------------------------------------------------------
 
-  const target = expectedName.toLowerCase().trim();
-  const targetChar = letter.trim();
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
-  // Jika senyap atau kosong
-  if (!transcript || rawSpeech.length === 0 || rawSpeech === "mendengar..." || rawSpeech === "mendengar") {
-    return {
-      score: 30,
-      stars: 1,
-      feedback: `Penilai AI tidak mendengar sebarang suara jelas. Mari cuba klik butang mikrofon dan sebut "${expectedName}" sekali lagi!`,
-      makhrajTip: makhrajRule || `Bunyi huruf ${letter} (${expectedName}) dilafazkan dari makhrajnya yang tersendiri.`,
-      isLocalFallback: true,
-      fallbackReason: errorReason
-    };
-  }
+// Kumpulan huruf yang bunyinya hampir sama - diberitahu kepada AI supaya lebih teliti
+const CONFUSABLE_NOTES = `
+Pasangan yang sering keliru (BEZAKAN dengan teliti):
+- Ta (ت) vs Tha (ط): Ta nipis, Tha tebal/berat.
+- Sin (س) vs Shad (ص) vs Syin (ش) vs Tsa (ث): Sin desis nipis, Shad desis tebal, Syin "sy", Tsa hujung lidah antara gigi.
+- Dal (د) vs Dhod (ض) vs Dzal (ذ) vs Dha (ظ).
+- Ha (ح) vs Hha (ه) vs Kho (خ): Ha bunyi nafas dalam dari kerongkong tengah, Hha hembusan ringan, Kho bunyi geseran dari pangkal tekak.
+- Alif (ا/أ) vs Ain (ع) vs Hamzah (ء).
+- Kaf (ك) vs Qof (ق): Kaf nipis di hadapan lidah, Qof tebal dari pangkal lidah.
+- Ghain (غ) vs Kho (خ).
+- Ro (ر) vs Lam (ل) vs Zai (ز).
+`.trim();
 
-  // Semakan padanan terus (Rumi atau Huruf Tunggal)
-  const isDirectMatch = 
-    speech === target || 
-    speech === targetChar || 
-    speech.split(/\s+/).includes(target) || 
-    speech.split(/\s+/).includes(targetChar);
+const LETTER_LIST = HIJAIYAH_LETTERS.map(l => `${l.id}. ${l.name} (${l.char})`).join("\n");
 
-  // Kamus Transliterasi Fonetik Hijaiyah Ringkas & Sangat Tepat (mengelakkan false-positive satu huruf, menyokong penulisan rumi dan jawi/arab)
-  const phoneticMatches: Record<string, string[]> = {
-    "alif": ["alif", "aleef", "lif", "alip", "alif alif", "ألف", "الف", "أ", "ا", "ألفا"],
-    "ba": ["ba", "bah", "baa", "be", "abah", "باء", "با", "ب"],
-    "ta": ["ta", "tah", "taa", "te", "tata", "تاء", "تا", "ت"],
-    "tsa": ["tsa", "tsah", "sa", "sah", "tha", "thah", "ثاء", "ثا", "ث"],
-    "jim": ["jim", "jeem", "je", "gim", "جym", "جيم", "جي", "ج"],
-    "ha": ["ha", "hah", "haa", "حاء", "حا", "ح"],
-    "kho": ["kho", "khoh", "kha", "khah", "ko", "koh", "خاء", "خا", "خ"],
-    "dal": ["dal", "dah", "deel", "da", "دal", "دال", "da", "د"],
-    "dzal": ["dzal", "zal", "zhal", "zaa", "za", "ذال", "ذا", "ذ"],
-    "ro": ["ro", "ra", "rah", "re", "aro", "راء", "را", "ر"],
-    "zai": ["zai", "za", "zay", "zei", "ze", "زاء", "زاي", "زا", "ز"],
-    "sin": ["sin", "seen", "se", "ssin", "سين", "سي", "س"],
-    "syin": ["syin", "sheen", "shin", "shyn", "sye", "شين", "شي", "ش"],
-    "shad": ["shad", "shod", "sad", "shor", "sod", "صاد", "صا", "ص"],
-    "dhod": ["dhod", "dad", "dod", "dhad", "daa", "ضاد", "ضا", "ض"],
-    "tha": ["tha", "tho", "thoh", "to", "toh", "ta", "tah", "طاء", "طا", "ط"],
-    "dha": ["dha", "zho", "zoh", "zo", "da", "dhor", "dha", "ظاء", "ظa", "ظ"],
-    "ain": ["ain", "ayn", "in", "aen", "عين", "عي", "ع"],
-    "ghain": ["ghain", "ghoin", "ghayn", "goin", "gho", "gha", "غin", "غين", "غي", "غ"],
-    "fa": ["fa", "fah", "fe", "pa", "pah", "فاء", "فا", "ف"],
-    "qof": ["qof", "qaf", "ko", "kof", "qo", "قاف", "قا", "ق"],
-    "kaf": ["kaf", "ka", "kah", "ke", "كaf", "كاف", "كا", "ك"],
-    "lam": ["lam", "la", "lh", "le", "لام", "لا", "ل"],
-    "mim": ["mim", "meem", "me", "ma", "mah", "ميم", "مي", "م"],
-    "nun": ["nun", "noon", "na", "nah", "ne", "نون", "نو", "ن"],
-    "wau": ["wau", "waw", "wo", "wah", "wa", "واو", "وا", "و"],
-    "hha": ["hha", "hah", "ha", "he", "hea", "ha besar", "besar", "hha", "ha besar", "هاء", "ها", "ه"],
-    "lam alif": ["lam alif", "la alif", "lamalif", "laa alif", "laa", "la", "لام الف", "لا"],
-    "hamzah": ["hamzah", "hamza", "amza", "همزة", "همزه", "ء"],
-    "ya": ["ya", "yah", "ye", "yaa", "ياء", "يا", "ي"]
-  };
-
-  const matchesOfTarget = phoneticMatches[target] || [target];
-  
-  // Semak jika sepadan secara fonetik
-  const isPhoneticMatch = matchesOfTarget.some(m => {
-    const cleanM = m.toLowerCase().trim();
-    if (speech === cleanM) return true;
-    
-    const speechWords = speech.split(/\s+/);
-    if (speechWords.includes(cleanM)) return true;
-    
-    // Sokong tulisan Arab/Jawi secara substring sekiranya ada penambahan perkataan lain dikesan oleh mikrofon
-    const isArabicScript = /[\u0600-\u06FF]/.test(cleanM);
-    if (isArabicScript) {
-      if (speech.includes(cleanM) || cleanM.includes(speech)) return true;
-    }
-    
-    // Untuk ejaan rumi, hadkan padanan substring hanya untuk frasa fonetik panjang (>=3 huruf) untuk mengelakkan salah faham "a" dalam "tata"
-    if (cleanM.length >= 3) {
-      if (speech.includes(cleanM)) return true;
-    } else if (cleanM.length === 2) {
-      if (speechWords.some(w => w === cleanM || w.startsWith(cleanM) || w.endsWith(cleanM))) return true;
-    }
-    return false;
-  });
-
-  let score = 0;
-  let stars = 1;
-  let feedback = "";
-
-  if (isDirectMatch || isPhoneticMatch) {
-    score = Math.floor(Math.random() * 8) + 93; // 93 to 100
-    stars = 5;
-    feedback = `Masha-Allah! Anak pintar menyebut "${rawSpeech}" dengan sangat baik, merdu, dan tepat untuk huruf "${expectedName}". Hebat sekali!`;
-  } else {
-    // Jika tidak sepadan langsung (Contoh: sebut "tata" semasa target "Alif")
-    score = Math.floor(Math.random() * 21) + 15; // 15% hingga 35%
-    stars = 1;
-    feedback = `Oops! Sebutan "${rawSpeech}" anda kurang bertepatan dengan huruf "${expectedName}". Mari cuba sebut sekali lagi ya, anda pasti boleh!`;
-  }
-
-  return {
-    score,
-    stars,
-    feedback,
-    makhrajTip: makhrajRule || `Bunyi huruf ${letter} (${expectedName}) dilafazkan mengikut organ makhraj tempatan yang betul.`,
-    isLocalFallback: true,
-    fallbackReason: errorReason
-  };
+function starsFromScore(score: number): number {
+  if (score >= 90) return 5;
+  if (score >= 80) return 4;
+  if (score >= 65) return 3;
+  if (score >= 40) return 2;
+  return 1;
 }
 
-// 1. API: Menilai sebutan Hijaiyah menggunakan Gemini AI (dengan perlindungan ralat serba boleh)
+function normName(n: string): string {
+  return String(n || "").toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z\u0600-\u06FF ]/g, "").trim();
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+// 1. API: Menilai sebutan Hijaiyah daripada rakaman audio
 app.post("/api/evaluate", async (req, res) => {
-  const { letter, transcript, expectedName, makhrajRule } = req.body;
+  const { letter, letterId, expectedName, makhrajRule, audioBase64, mimeType } = req.body || {};
+
+  if (!letter || !expectedName) {
+    return res.status(400).json({ status: "error", error: "Sila berikan huruf dan nama huruf." });
+  }
+  if (!audioBase64 || typeof audioBase64 !== "string") {
+    // Tiada audio = tiada penilaian. JANGAN beri skor.
+    return res.status(400).json({ status: "no_audio", scored: false, error: "Tiada rakaman suara diterima." });
+  }
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(503).json({
+      status: "ai_unavailable",
+      scored: false,
+      error: "Penilai AI belum disediakan (GEMINI_API_KEY tiada)."
+    });
+  }
+
+  const target = HIJAIYAH_LETTERS.find(l => l.id === Number(letterId)) ||
+    HIJAIYAH_LETTERS.find(l => normName(l.name) === normName(expectedName)) ||
+    HIJAIYAH_LETTERS.find(l => l.char === letter);
+  const targetName = target?.name || expectedName;
 
   try {
-    if (!letter || !expectedName) {
-      return res.status(400).json({ error: "Sila berikan huruf dan nama huruf." });
-    }
-
-    const hasApiKey = !!process.env.GEMINI_API_KEY;
-
-    if (!hasApiKey) {
-      // Pembubaran fallback secara pintar apabila kunci API tiada
-      const fallbackResult = getLocalCoachEvaluation(
-        letter || "أ",
-        transcript || "",
-        expectedName || "Alif",
-        makhrajRule || "",
-        "Mod Luar Talian (Tiada Kunci API)"
-      );
-      return res.json(fallbackResult);
-    }
-
     const ai = getGemini();
-    const prompt = `
-      Sila nilaikan sebutan murid prasekolah/sekolah rendah yang menyebut huruf Hijaiyah berikut secara sangat teliti dan logik:
-      Huruf Sasaran: "${letter}" (Nama: ${expectedName})
-      Penerangan Makhraj Standard: ${makhrajRule || "Sila huraikan mengikut asas tajwid"}
-      Teks Sebutan Murid Rekod (Speech-to-Text): "${transcript || ""}"
 
-      TUGAS PENILAIAN YANG LOGIK:
-      Bandingkan teks sebutan murid ("${transcript}") dengan nama huruf "${expectedName}" atau huruf "${letter}" dalam bahasa Arab.
-      
-      Peraturan Skor:
-      1. SANGAT TIDAK SEPADAN / SALAH SEBUT: Sekiranya transkrip mengandungi perkataan atau sebutan yang salah atau tidak berkaitan langsung dengan huruf sasaran (contohnya menyebut benda lain, perkataan lain seperti "makan", "salah", "buku" dsb semasa sasaran adalah "${expectedName}"), berikan skor yang sangat rendah secara logik iaitu di antara 10% hingga 35%. Jangan berikan markah lulus (bawah 40%). Maklum balas harus menyebut bahawa sebutan yang dikesan adalah berbeza secara mesra.
-      2. KOSONG / DI_AM: Sekiranya transkrip kosong, "mendengar...", atau murid senyap, berikan skor penglibatan yang sangat rendah di antara 5% hingga 15% sahaja dengan motivasi ceria untuk mencuba.
-      3. SEPARA TEPAT: Sekiranya sebutan agak dekat atau mengandungi bunyi yang hampir serupa tetapi tidak sempurna, berikan skor sederhana di antara 40% hingga 75%.
-      4. SANGAT TEPAT / CEMERLANG: Sekiranya sebutan adalah tepat atau sepadan secara fonetik dengan bunyi huruf, berikan skor yang cemerlang di antara 80% hingga 100%.
+    const prompt = `Anda ialah pemeriksa sebutan huruf Hijaiyah untuk kanak-kanak Melayu.
+Dengar rakaman audio dan tentukan HURUF APA yang disebut oleh kanak-kanak itu.
 
-      Sediakan maklum balas interaktif yang ringkas, ceria, penuh kasih sayang, dalam Bahasa Melayu, mesra kanak-kanak (gunakan gelaran mesra seperti 'Wah, hebatnya anak pintar!' atau 'Syabas murid bijak!').
-    `;
+Huruf sasaran yang sepatutnya disebut: ${targetName} (${target?.char || letter})
+Makhraj: ${makhrajRule || "-"}
+
+Senarai SEMUA huruf yang mungkin (pilih satu sahaja untuk "heardLetter"):
+${LETTER_LIST}
+
+${CONFUSABLE_NOTES}
+
+Peraturan WAJIB:
+1. Dengar audio sebenar. JANGAN meneka berdasarkan huruf sasaran. Laporkan apa yang BENAR-BENAR didengar.
+2. Kanak-kanak mungkin menyebut nama huruf (contoh "ba", "tsa") atau bunyi huruf dengan baris (contoh "ba", "bi", "bu"). Kedua-duanya boleh diterima.
+3. "audioQuality": "silent" jika tiada suara, "noise" jika hanya bunyi latar/hingar/bukan sebutan huruf, "speech" jika ada sebutan jelas.
+4. Jika audioQuality bukan "speech", set heardLetter = "none".
+5. Jika sebutan tidak jelas tetapi ada, pilih huruf paling hampir dan letakkan "confidence" rendah (di bawah 50).
+6. "accuracy" (0-100) ialah seberapa tepat makhraj dan bunyi huruf SASARAN disebut (jika huruf yang didengar bukan sasaran, accuracy mesti di bawah 40).
+7. "feedback": satu atau dua ayat pendek, mesra kanak-kanak, dalam Bahasa Melayu. Jika salah, nyatakan huruf yang kedengaran berbeza dan cara membetulkannya. Gunakan ejaan nama huruf seperti dalam senarai (cth. Kho, Ro, Zai, Shad, Tha, Dha, Ghain, Hha). Jangan sebut skor.
+8. "makhrajTip": satu tip ringkas cara menyebut huruf ${targetName} dalam Bahasa Melayu.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
+      model: GEMINI_MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: mimeType || "audio/wav", data: audioBase64 } },
+            { text: prompt }
+          ]
+        }
+      ],
       config: {
-        systemInstruction: "Anda adalah guru pakar AI yang mahir dalam tajwid terutamanya makhraj huruf Hijaiyah untuk kanak-kanak di Malaysia. Anda memberikan penilaian yang positif, bermotivasi tinggi, dan ramah. PENTING: Anda MESTI menggunakan ejaan nama huruf yang diberikan dalam parameter 'expectedName' sepenuhnya di dalam ulasan maklum balas dan tips anda. CONTOH: Gunakan 'Kho' (Bukan 'Kha'), 'Ro' (Bukan 'Ra'), 'Zai' (Bukan 'Za'), 'Shad' (Bukan 'Sod'), 'Tha' (Bukan 'Tho'), 'Dha' (Bukan 'Zho'), 'Ghain' (Bukan 'Ghoin'), dan 'Hha' (Bukan 'Ha'). Jangan sesekali menyebut perkataan 'Kha' untuk huruf Kho.",
+        temperature: 0,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            score: { 
-              type: Type.INTEGER, 
-              description: "Skor peratusan sebutan dari 0 hingga 100 berdasarkan ketepatan transkrip dengan huruf sasaran. Berikan skor di bawah 40 (cth: 10-35) jika transkrip tidak berkaitan langsung atau salah sebutan." 
-            },
-            stars: { 
-              type: Type.INTEGER, 
-              description: "Bintang dari 1 hingga 5 ditentukan dari skor (90-100 = 5, 80-89 = 4, 70-79 = 3, 40-69 = 2, di bawah 40 = 1)." 
-            },
-            feedback: { 
-              type: Type.STRING, 
-              description: "Ulasan yang sangat mesra kanak-kanak, kelakar, atau memberikan pujian semangat dalam Bahasa Melayu." 
-            },
-            makhrajTip: { 
-              type: Type.STRING, 
-              description: "Tips ringkas & ringkas dalam Bahasa Melayu menerangkan cara sebutan makhraj huruf dari mulut/lidah." 
-            }
+            audioQuality: { type: Type.STRING, enum: ["silent", "noise", "speech"] },
+            heardLetter: { type: Type.STRING, description: "Nama huruf yang didengar, tepat seperti dalam senarai, atau 'none'" },
+            confidence: { type: Type.INTEGER, description: "Keyakinan 0-100 terhadap huruf yang didengar" },
+            accuracy: { type: Type.INTEGER, description: "Ketepatan sebutan terhadap huruf sasaran 0-100" },
+            feedback: { type: Type.STRING },
+            makhrajTip: { type: Type.STRING }
           },
-          required: ["score", "stars", "feedback", "makhrajTip"]
+          required: ["audioQuality", "heardLetter", "confidence", "accuracy", "feedback", "makhrajTip"]
         }
       }
     });
 
-    const resultText = response.text?.trim() || "{}";
-    const resultJson = JSON.parse(resultText);
-    return res.json(resultJson);
+    const raw = JSON.parse((response.text || "{}").trim());
+    const quality: string = raw.audioQuality || "silent";
+    const heard = normName(raw.heardLetter || "none");
+    const confidence = clamp(Number(raw.confidence) || 0, 0, 100);
+    const accuracy = clamp(Number(raw.accuracy) || 0, 0, 100);
+    const tip = raw.makhrajTip || makhrajRule || "";
 
+    // Tiada suara / hingar sahaja -> tidak dinilai (tiada skor, tiada XP)
+    if (quality !== "speech" || heard === "none" || heard === "") {
+      return res.json({
+        status: "no_speech",
+        scored: false,
+        score: 0,
+        stars: 0,
+        heardLetter: null,
+        feedback: `Suara adik belum kedengaran dengan jelas. Dekatkan telefon ke mulut, sebut "${targetName}" dengan lantang, dan cuba lagi ya!`,
+        makhrajTip: tip
+      });
+    }
+
+    const isMatch = heard === normName(targetName);
+    let score: number;
+
+    if (isMatch) {
+      // Betul huruf: skor mengikut ketepatan, dihadkan oleh keyakinan
+      score = clamp(accuracy, 60, 100);
+      if (confidence < 50) score = Math.min(score, 69);
+      else if (confidence < 70) score = Math.min(score, 84);
+    } else {
+      // SALAH huruf: tidak boleh melepasi 35 walau apa pun yang AI kata
+      score = clamp(Math.round(accuracy * 0.5), 10, 35);
+    }
+
+    return res.json({
+      status: "ok",
+      scored: true,
+      score,
+      stars: starsFromScore(score),
+      heardLetter: raw.heardLetter,
+      isMatch,
+      confidence,
+      feedback: raw.feedback || (isMatch ? "Syabas!" : "Cuba lagi ya!"),
+      makhrajTip: tip
+    });
   } catch (error: any) {
-    console.log("[Sistem Penilai] Mengaktifkan penilaian alternatif pintar.");
-    // Jalankan smart local evaluation untuk menjamin aplikasi tidak tergendala / terhenti demi pelajar
-    const fallbackResult = getLocalCoachEvaluation(
-      letter || "أ",
-      transcript || "",
-      expectedName || "Alif",
-      makhrajRule || "",
-      "Sistem sibuk, beralih ke mod pintar tempatan."
-    );
-    return res.json(fallbackResult);
+    console.error("[Penilai] Ralat Gemini:", error?.message || error);
+    // JANGAN pernah memulangkan skor rekaan apabila AI gagal.
+    return res.status(502).json({
+      status: "ai_error",
+      scored: false,
+      error: "Penilai AI sedang sibuk atau tidak dapat dihubungi. Sila cuba lagi sebentar."
+    });
   }
 });
 
